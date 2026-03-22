@@ -1,0 +1,43 @@
+{
+    "name": "radio-scosc-listener",
+    "version": "0.1.0",
+    "description": "Radio SCOSC Listener — audience client for Radio SCOSC sessions",
+    "main": "main.js",
+    "scripts": {
+        "start": "electron .",
+        "build:mac": "electron-builder --mac",
+        "build:win": "electron-builder --win",
+        "build:linux": "electron-builder --linux"
+    },
+    "dependencies": {
+        "electron": "^30.0.0",
+        "ws": "^8.0.0"
+    },
+    "devDependencies": {
+        "electron-builder": "^24.0.0"
+    },
+    "build": {
+        "appId": "asia.oschub.radio-scosc-listener",
+        "productName": "Radio SCOSC Listener",
+        "files": [
+            "**/*"
+        ],
+        "extraResources": [
+            {
+                "from": "sc/",
+                "to": "sc/",
+                "filter": ["**/*"]
+            }
+        ],
+        "mac": {
+            "target": "dmg",
+            "category": "public.app-category.music"
+        },
+        "win": {
+            "target": "nsis"
+        },
+        "linux": {
+            "target": "AppImage"
+        }
+    }
+}

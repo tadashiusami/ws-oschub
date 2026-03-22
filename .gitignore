@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# Node / Electron
+node_modules/
+dist/
+out/
+
+# scsynth binaries (add your own to listener/sc/)
+listener/sc/scsynth
+listener/sc/scsynth.exe
+
+# OS
+.DS_Store
+Thumbs.db
