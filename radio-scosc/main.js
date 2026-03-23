@@ -12,15 +12,14 @@ const WebSocket = require('ws');
 const dgram = require('dgram');
 
 // --- Configuration ---
-// Replace HUB_URL with your hub server address
-const HUB_URL = 'wss://your-hub-server.example.com';
 const SC_PORT = 57110;
 const RECONNECT_MS = 3000;
 const SCSYNTH_BOOT_WAIT_MS = 2000;
 
 // Listener name is auto-generated
 const MY_NAME = 'Listener-' + Math.floor(Math.random() * 1000);
-let roomName = null;
+let HUB_URL    = '';
+let roomName   = null;
 let sampleRate = 48000;
 
 let mainWindow;
@@ -60,8 +59,9 @@ function createWindow() {
 // =========================================
 // IPC
 // =========================================
-ipcMain.on('join-room', (event, { room, rate }) => {
-    roomName = room;
+ipcMain.on('join-room', (event, { hub, room, rate }) => {
+    HUB_URL    = hub;
+    roomName   = room;
     sampleRate = rate;
     startScsynth();
     setTimeout(connectToHub, SCSYNTH_BOOT_WAIT_MS);

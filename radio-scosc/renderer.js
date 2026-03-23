@@ -1,6 +1,7 @@
 const dot        = document.getElementById('dot');
 const statusText = document.getElementById('status-text');
 const logEl      = document.getElementById('log');
+const hubInput   = document.getElementById('hub-input');
 const roomInput  = document.getElementById('room-input');
 const rateSelect = document.getElementById('rate-select');
 const joinBtn    = document.getElementById('join-btn');
@@ -13,15 +14,17 @@ const STATUS_LABELS = {
 };
 
 joinBtn.addEventListener('click', () => {
+    const hub  = hubInput.value.trim();
     const room = roomInput.value.trim();
-    if (!room) return;
+    if (!hub || !room) return;
     const rate = parseInt(rateSelect.value);
     joinBtn.disabled    = true;
+    hubInput.disabled   = true;
     roomInput.disabled  = true;
     rateSelect.disabled = true;
     dot.className       = 'connecting';
     statusText.textContent = 'Connecting...';
-    window.api.joinRoom(room, rate);
+    window.api.joinRoom(hub, room, rate);
 });
 
 roomInput.addEventListener('keydown', (e) => {
