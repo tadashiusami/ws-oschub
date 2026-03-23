@@ -180,10 +180,7 @@ OSCdef(\remoteProxy, { |msg|
    - Windows: `radio-scosc/sc/scsynth.exe`
    - The binary is included in your SuperCollider installation (`SuperCollider.app/Contents/Resources/scsynth` on macOS).
 
-2. Set `HUB_URL` in `radio-scosc/main.js` to your hub server address:
-   ```javascript
-   const HUB_URL = 'wss://your-hub-domain.example.com';
-   ```
+
 
 #### Run (development)
 
@@ -204,7 +201,7 @@ npm run build:linux  # Linux AppImage
 #### Usage
 
 1. Launch the app.
-2. Enter the room name and select the session sample rate.
+2. Enter the hub server address, room name, and sample rate.
 3. Click **Join** — audio will play automatically when performers send sound.
 
 > **Important:** Set your OS audio output sample rate to match the session rate before launching the app. On Linux, ensure JACK is running at the same rate.
