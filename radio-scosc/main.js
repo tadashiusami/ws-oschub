@@ -1,8 +1,8 @@
 /**
- * main.js - Electron main process for Radio SCOSC Listener
+ * main.js - Electron main process for Radio SCOSC
  *
  * Launches scsynth locally and connects to the hub server via WebSocket.
- * Received OSC messages are forwarded to scsynth via UDP.
+ * Received OSC binary frames are forwarded to scsynth via UDP as-is.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -77,7 +77,7 @@ function startScsynth() {
     scsynthProcess = spawn(scsynthPath, [
         '-u', String(SC_PORT),
         '-a', '1024',
-        '-i', '2',   // keep input enabled to avoid sample rate mismatch errors
+        '-i', '2',
         '-o', '2',
         '-S', String(sampleRate)
     ]);
@@ -103,54 +103,6 @@ function startScsynth() {
 }
 
 // =========================================
-// OSC message builder
-// =========================================
-function padToFour(buf) {
-    const pad = 4 - (buf.length % 4);
-    return pad === 4 ? buf : Buffer.concat([buf, Buffer.alloc(pad)]);
-}
-
-function buildOscMessage(address, args) {
-    const addrBuf = padToFour(Buffer.from(address + '\0', 'utf8'));
-
-    let typetag = ',';
-    const argBuffers = [];
-
-    for (const arg of args) {
-        if (arg && typeof arg === 'object' && arg.__type__ === 'bytes') {
-            const data = Buffer.from(arg.data, 'base64');
-            typetag += 'b';
-            const lenBuf = Buffer.alloc(4);
-            lenBuf.writeUInt32BE(data.length);
-            argBuffers.push(lenBuf, padToFour(data));
-        } else if (typeof arg === 'number' && Number.isInteger(arg)) {
-            typetag += 'i';
-            const b = Buffer.alloc(4);
-            b.writeInt32BE(arg);
-            argBuffers.push(b);
-        } else if (typeof arg === 'number') {
-            typetag += 'f';
-            const b = Buffer.alloc(4);
-            b.writeFloatBE(arg);
-            argBuffers.push(b);
-        } else if (typeof arg === 'string') {
-            typetag += 's';
-            argBuffers.push(padToFour(Buffer.from(arg + '\0', 'utf8')));
-        }
-    }
-
-    const typetagBuf = padToFour(Buffer.from(typetag + '\0', 'utf8'));
-    return Buffer.concat([addrBuf, typetagBuf, ...argBuffers]);
-}
-
-function sendOscToScsynth(address, args) {
-    const buf = buildOscMessage(address, args);
-    udpClient.send(buf, SC_PORT, '127.0.0.1', (err) => {
-        if (err) console.error('UDP send error:', err);
-    });
-}
-
-// =========================================
 // WebSocket connection
 // =========================================
 function connectToHub() {
@@ -168,18 +120,20 @@ function connectToHub() {
     });
 
     wsClient.on('message', (raw) => {
-        let data;
-        try { data = JSON.parse(raw); }
-        catch { return; }
-
-        switch (data.type) {
-            case 'info':
+        if (raw instanceof Buffer) {
+            // Binary OSC frame — forward directly to scsynth via UDP
+            udpClient.send(raw, SC_PORT, '127.0.0.1', (err) => {
+                if (err) console.error('UDP send error:', err);
+            });
+        } else {
+            // Text frame — info message from hub
+            let data;
+            try { data = JSON.parse(raw); }
+            catch { return; }
+            if (data.type === 'info') {
                 sendToUI('status', 'connected');
                 sendToUI('log', data.message);
-                break;
-            case 'osc':
-                sendOscToScsynth(data.address, data.args);
-                break;
+            }
         }
     });
 
@@ -208,7 +162,6 @@ function sendToUI(channel, message) {
 // =========================================
 app.whenReady().then(() => {
     createWindow();
-    // scsynth and hub connection are started after room/rate input from renderer
 });
 
 app.on('window-all-closed', () => {
