@@ -142,27 +142,41 @@ Options:
 
 You will be prompted for your name and room name on startup.
 
-#### SuperCollider usage
+#### SuperCollider setup for performers
+
+Each performer must have the following OSCdef running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120) and forwards it to scsynth.
 
 ```supercollider
-// Send OSC to local.py (port 57121)
-~hub = NetAddr("127.0.0.1", 57121);
+// Receive OSC from remote performers and forward to scsynth
+OSCdef(\remoteProxy, { |msg, time, addr|
+    s.addr.sendMsg(*msg);
+}, '/remote');
+```
 
-// Send a SynthDef
-~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440|
-    Out.ar(0, SinOsc.ar(freq) * 0.2 * EnvGen.kr(Env.perc, doneAction:2))
-}).asBytes);
+A typical session setup looks like this:
 
-// Create, modify and free a synth
-~hub.sendMsg("/s_new", \sine, 2000, 0, 0, \freq, 432);
-~hub.sendMsg("/n_set", 2000, \freq, 648);
-~hub.sendMsg("/n_free", 2000);
+```supercollider
+// 1. Boot the server
+s.waitForBoot({
 
-// Synchronise timing with sendBundle
-// All participants receive the bundle with its timetag intact,
-// so scsynth executes it at the same moment on every machine
-// (requires NTP-synchronised system clocks, which is standard on modern OS)
-~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
+    // 2. Set up the remote proxy
+    OSCdef(\remoteProxy, { |msg, time, addr|
+        s.addr.sendMsg(*msg);
+    }, '/remote');
+
+    // 3. Send your SynthDef to all participants
+    ~hub = NetAddr("127.0.0.1", 57121);
+    ~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440, amp=0.2|
+        Out.ar(0, SinOsc.ar(freq) * amp * EnvGen.kr(Env.perc, doneAction:2))
+    }).asBytes);
+
+    // 4. Play — sendBundle keeps timing tight across the network
+    // The timetag offset should be larger than the maximum network latency
+    // (0.3s is a safe default for domestic sessions)
+    ~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
+    ~hub.sendBundle(0.3, ["/n_set", 2000, \freq, 648]);
+    ~hub.sendBundle(0.3, ["/n_free", 2000]);
+});
 ```
 
 > **Note on node IDs:** Node IDs are not managed automatically. Performers should coordinate in advance to avoid conflicts (e.g. Alice uses 1000–1999, Bob uses 2000–2999).
@@ -185,8 +199,18 @@ You will be prompted for your name and room name on startup.
 #### How it works
 
 1. On **Join**, Radio SCOSC launches sclang with an init script.
-2. sclang boots scsynth and sets up an OSCdef that forwards all incoming OSC to scsynth.
+2. sclang boots scsynth and automatically sets up the following OSCdef:
+
+```supercollider
+OSCdef(\remoteProxy, { |msg, time, addr|
+    s.addr.sendMsg(*msg);
+}, '/remote');
+```
+
 3. Radio SCOSC connects to the hub and forwards received OSC binary frames to sclang via UDP (port 57120).
+4. The OSCdef relays all incoming OSC to scsynth, so audio plays automatically.
+
+No SC coding is required on the listener's side.
 
 #### Run (development)
 
