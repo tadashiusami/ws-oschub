@@ -1,44 +1,73 @@
 /**
- * main.js - Electron main process for Radio SCOSC Listener
+ * main.js - Electron main process for Radio SCOSC
  *
- * Launches scsynth locally and connects to the hub server via WebSocket.
- * Received OSC messages are forwarded to scsynth via UDP.
+ * Launches sclang (SuperCollider must be installed) and connects to the
+ * hub server via WebSocket. Received OSC binary frames are forwarded to
+ * sclang via UDP, which relays them to scsynth via OSCdef.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
-const { spawn } = require('child_process');
+const { spawn, execSync } = require('child_process');
 const path = require('path');
+const fs   = require('fs');
+const os   = require('os');
 const WebSocket = require('ws');
 const dgram = require('dgram');
 
 // --- Configuration ---
-// Replace HUB_URL with your hub server address
-const HUB_URL = 'wss://your-hub-server.example.com';
-const SC_PORT = 57110;
+const SC_PORT      = 57120;   // sclang receive port
 const RECONNECT_MS = 3000;
-const SCSYNTH_BOOT_WAIT_MS = 2000;
 
 // Listener name is auto-generated
 const MY_NAME = 'Listener-' + Math.floor(Math.random() * 1000);
-let roomName = null;
+let HUB_URL    = '';
+let roomName   = null;
 let sampleRate = 48000;
 
 let mainWindow;
-let scsynthProcess;
+let sclangProcess;
 let wsClient;
 const udpClient = dgram.createSocket('udp4');
 
 // =========================================
-// scsynth path (platform-aware)
+// sclang path detection
 // =========================================
-function getScsynthPath() {
-    const base = app.isPackaged
-        ? path.join(process.resourcesPath, 'sc')
-        : path.join(__dirname, 'sc');
+function getSclangPath() {
+    // Platform-specific candidate paths
+    const candidates = {
+        darwin: [
+            '/Applications/SuperCollider.app/Contents/MacOS/sclang',
+            `${os.homedir()}/Applications/SuperCollider.app/Contents/MacOS/sclang`
+        ],
+        win32: [
+            'C:\\Program Files\\SuperCollider\\sclang.exe',
+            'C:\\Program Files (x86)\\SuperCollider\\sclang.exe'
+        ]
+    };
 
-    return process.platform === 'win32'
-        ? path.join(base, 'scsynth.exe')
-        : path.join(base, 'scsynth');
+    if (process.platform === 'linux') {
+        // Search PATH dynamically on Linux
+        try {
+            const found = execSync('which sclang').toString().trim();
+            if (found) return found;
+        } catch {}
+        // Common fallback paths
+        const linuxPaths = [
+            '/usr/bin/sclang',
+            '/usr/local/bin/sclang',
+            '/opt/SuperCollider/sclang'
+        ];
+        for (const p of linuxPaths) {
+            if (fs.existsSync(p)) return p;
+        }
+        return null;
+    }
+
+    const paths = candidates[process.platform] || [];
+    for (const p of paths) {
+        if (fs.existsSync(p)) return p;
+    }
+    return null;
 }
 
 // =========================================
@@ -47,7 +76,7 @@ function getScsynthPath() {
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 480,
-        height: 360,
+        height: 400,
         resizable: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -60,93 +89,81 @@ function createWindow() {
 // =========================================
 // IPC
 // =========================================
-ipcMain.on('join-room', (event, { room, rate }) => {
-    roomName = room;
+ipcMain.on('join-room', (event, { hub, room, rate }) => {
+    HUB_URL    = hub;
+    roomName   = room;
     sampleRate = rate;
-    startScsynth();
-    setTimeout(connectToHub, SCSYNTH_BOOT_WAIT_MS);
+    startSclang(rate, () => {
+        connectToHub();
+    });
 });
 
 // =========================================
-// scsynth
+// sclang
 // =========================================
-function startScsynth() {
-    const scsynthPath = getScsynthPath();
-    console.log(`Starting scsynth: ${scsynthPath}`);
+function startSclang(rate, onReady) {
+    const sclangPath = getSclangPath();
 
-    scsynthProcess = spawn(scsynthPath, [
-        '-u', String(SC_PORT),
-        '-a', '1024',
-        '-i', '2',   // keep input enabled to avoid sample rate mismatch errors
-        '-o', '2',
-        '-S', String(sampleRate)
-    ]);
+    if (!sclangPath) {
+        sendToUI('log', '⚠ sclang not found. Please install SuperCollider.');
+        sendToUI('status', 'error');
+        return;
+    }
 
-    scsynthProcess.stdout.on('data', (d) => {
+    console.log(`Starting sclang: ${sclangPath}`);
+    sendToUI('log', `Starting sclang: ${sclangPath}`);
+
+    // Write init code to a temp file
+    const initCode = [
+        `s.options.sampleRate = ${rate};`,
+        `s.waitForBoot({`,
+        `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
+        `        s.addr.sendMsg(*msg);`,
+        `    }, '/remote');`,
+        `    "Radio SCOSC ready".postln;`,
+        `});`
+    ].join('\n');
+
+    const tmpFile = path.join(os.tmpdir(), 'radio-scosc-init.scd');
+    fs.writeFileSync(tmpFile, initCode);
+
+    sclangProcess = spawn(sclangPath, [tmpFile]);
+
+    let ready = false;
+
+    // Timeout fallback (5 seconds)
+    const timeout = setTimeout(() => {
+        if (!ready) {
+            console.log('sclang boot timeout — connecting anyway');
+            ready = true;
+            onReady();
+        }
+    }, 5000);
+
+    sclangProcess.stdout.on('data', (d) => {
         const msg = d.toString().trim();
-        console.log(`[scsynth] ${msg}`);
+        console.log(`[sclang] ${msg}`);
         sendToUI('log', msg);
+
+        // Detect boot completion
+        if (!ready && msg.includes('Radio SCOSC ready')) {
+            clearTimeout(timeout);
+            ready = true;
+            onReady();
+        }
     });
 
-    scsynthProcess.stderr.on('data', (d) => {
+    sclangProcess.stderr.on('data', (d) => {
         const msg = d.toString().trim();
-        console.error(`[scsynth err] ${msg}`);
+        console.error(`[sclang err] ${msg}`);
         if (msg.includes('cannot set sample rate') || msg.includes('could not initialize audio')) {
             sendToUI('log', '⚠ Audio init failed. Check that OS audio sample rate matches the session rate.');
         }
     });
 
-    scsynthProcess.on('close', (code) => {
-        console.log(`scsynth exited: ${code}`);
+    sclangProcess.on('close', (code) => {
+        console.log(`sclang exited: ${code}`);
         sendToUI('status', 'error');
-    });
-}
-
-// =========================================
-// OSC message builder
-// =========================================
-function padToFour(buf) {
-    const pad = 4 - (buf.length % 4);
-    return pad === 4 ? buf : Buffer.concat([buf, Buffer.alloc(pad)]);
-}
-
-function buildOscMessage(address, args) {
-    const addrBuf = padToFour(Buffer.from(address + '\0', 'utf8'));
-
-    let typetag = ',';
-    const argBuffers = [];
-
-    for (const arg of args) {
-        if (arg && typeof arg === 'object' && arg.__type__ === 'bytes') {
-            const data = Buffer.from(arg.data, 'base64');
-            typetag += 'b';
-            const lenBuf = Buffer.alloc(4);
-            lenBuf.writeUInt32BE(data.length);
-            argBuffers.push(lenBuf, padToFour(data));
-        } else if (typeof arg === 'number' && Number.isInteger(arg)) {
-            typetag += 'i';
-            const b = Buffer.alloc(4);
-            b.writeInt32BE(arg);
-            argBuffers.push(b);
-        } else if (typeof arg === 'number') {
-            typetag += 'f';
-            const b = Buffer.alloc(4);
-            b.writeFloatBE(arg);
-            argBuffers.push(b);
-        } else if (typeof arg === 'string') {
-            typetag += 's';
-            argBuffers.push(padToFour(Buffer.from(arg + '\0', 'utf8')));
-        }
-    }
-
-    const typetagBuf = padToFour(Buffer.from(typetag + '\0', 'utf8'));
-    return Buffer.concat([addrBuf, typetagBuf, ...argBuffers]);
-}
-
-function sendOscToScsynth(address, args) {
-    const buf = buildOscMessage(address, args);
-    udpClient.send(buf, SC_PORT, '127.0.0.1', (err) => {
-        if (err) console.error('UDP send error:', err);
     });
 }
 
@@ -168,18 +185,20 @@ function connectToHub() {
     });
 
     wsClient.on('message', (raw) => {
-        let data;
-        try { data = JSON.parse(raw); }
-        catch { return; }
-
-        switch (data.type) {
-            case 'info':
+        if (raw instanceof Buffer) {
+            // Binary OSC frame — forward to sclang via UDP
+            udpClient.send(raw, SC_PORT, '127.0.0.1', (err) => {
+                if (err) console.error('UDP send error:', err);
+            });
+        } else {
+            // Text frame — info message from hub
+            let data;
+            try { data = JSON.parse(raw); }
+            catch { return; }
+            if (data.type === 'info') {
                 sendToUI('status', 'connected');
                 sendToUI('log', data.message);
-                break;
-            case 'osc':
-                sendOscToScsynth(data.address, data.args);
-                break;
+            }
         }
     });
 
@@ -208,11 +227,10 @@ function sendToUI(channel, message) {
 // =========================================
 app.whenReady().then(() => {
     createWindow();
-    // scsynth and hub connection are started after room/rate input from renderer
 });
 
 app.on('window-all-closed', () => {
-    if (scsynthProcess) scsynthProcess.kill();
+    if (sclangProcess) sclangProcess.kill();
     udpClient.close();
     if (process.platform !== 'darwin') app.quit();
 });

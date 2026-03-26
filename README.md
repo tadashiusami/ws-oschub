@@ -2,18 +2,23 @@
 
 **WebSocket OSC Hub** is a minimal system for sharing OSC messages between multiple [SuperCollider](https://supercollider.github.io/) instances over the internet via WebSocket.
 
-Performers send OSC commands (SynthDef, s_new, n_set, n_free, etc.) from their local SC environment through a hub server, where they are broadcast to all other participants in the same room. An audience client (**Radio SCOSC**) allows listeners to join a session and hear the performance without any SC coding knowledge.
+Performers send OSC commands (`/d_recv`, `/s_new`, `/n_set`, `/n_free`, `sendBundle`, etc.) from their local SC environment through a hub server, where they are broadcast to all other participants in the same room. OSC data is forwarded as raw binary, so all OSC message types including Bundles with timetags are supported.
+
+An audience client (**Radio SCOSC**) allows listeners to join a session and hear the performance without any SC coding knowledge.
 
 ---
 
 ## Architecture
 
 ```
-[SC] <--OSC/UDP--> [local.py] <--wss--> [hub.py on server] <--wss--> [local.py] <--OSC/UDP--> [SC]
-                                                    |
-                                             [Radio SCOSC]
-                                       (Electron app + scsynth)
+[SC] <--OSC/UDP--> [local.py] <--wss (binary)--> [hub.py] <--wss (binary)--> [local.py] <--OSC/UDP--> [SC]
+                                                      |
+                                               [Radio SCOSC]
+                                     (Electron app — requires SuperCollider)
+                                         sclang + OSCdef → scsynth
 ```
+
+OSC packets are forwarded as raw binary frames over WebSocket. The hub relays them without parsing. OSC Bundles with timetags are preserved, allowing performers to synchronise rhythm and tempo across remote locations using `sendBundle`.
 
 ---
 
@@ -31,10 +36,7 @@ websocket-osc-hub/
     ├── preload.js
     ├── renderer.html
     ├── renderer.js
-    ├── package.json
-    └── sc/
-        ├── scsynth        # Place macOS/Linux binary here
-        └── scsynth.exe    # Place Windows binary here
+    └── package.json
 ```
 
 ---
@@ -51,8 +53,8 @@ websocket-osc-hub/
 - SuperCollider 3.x
 
 ### Radio SCOSC listener app
-- Node.js 18+
-- A copy of the `scsynth` binary for your platform (see below)
+- **SuperCollider 3.x** (required — sclang is launched automatically)
+- Node.js 18+ (development/build only)
 
 ---
 
@@ -156,15 +158,11 @@ You will be prompted for your name and room name on startup.
 ~hub.sendMsg("/n_set", 2000, \freq, 648);
 ~hub.sendMsg("/n_free", 2000);
 
-// Receive OSC from remote performers
-// All incoming messages arrive at /remote with sender name and original address prepended
-OSCdef(\remoteProxy, { |msg|
-    var sender  = msg[1].asString;
-    var address = msg[2].asString;
-    var args    = msg[3..];
-    (sender ++ " -> " ++ address).postln;
-    s.addr.sendMsg(address, *args);
-}, '/remote');
+// Synchronise timing with sendBundle
+// All participants receive the bundle with its timetag intact,
+// so scsynth executes it at the same moment on every machine
+// (requires NTP-synchronised system clocks, which is standard on modern OS)
+~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
 ```
 
 > **Note on node IDs:** Node IDs are not managed automatically. Performers should coordinate in advance to avoid conflicts (e.g. Alice uses 1000–1999, Bob uses 2000–2999).
@@ -175,15 +173,20 @@ OSCdef(\remoteProxy, { |msg|
 
 #### Prerequisites
 
-1. Place the `scsynth` binary for your platform in `radio-scosc/sc/`:
-   - macOS/Linux: `radio-scosc/sc/scsynth`
-   - Windows: `radio-scosc/sc/scsynth.exe`
-   - The binary is included in your SuperCollider installation (`SuperCollider.app/Contents/Resources/scsynth` on macOS).
+- **SuperCollider must be installed** on the listener's machine.
+- Radio SCOSC detects sclang automatically at the following default paths:
 
-2. Set `HUB_URL` in `radio-scosc/main.js` to your hub server address:
-   ```javascript
-   const HUB_URL = 'wss://your-hub-domain.example.com';
-   ```
+| Platform | Default path |
+|----------|-------------|
+| macOS | `/Applications/SuperCollider.app/Contents/MacOS/sclang` |
+| Windows | `C:\Program Files\SuperCollider\sclang.exe` |
+| Linux | detected via `which sclang` |
+
+#### How it works
+
+1. On **Join**, Radio SCOSC launches sclang with an init script.
+2. sclang boots scsynth and sets up an OSCdef that forwards all incoming OSC to scsynth.
+3. Radio SCOSC connects to the hub and forwards received OSC binary frames to sclang via UDP (port 57120).
 
 #### Run (development)
 
@@ -203,11 +206,12 @@ npm run build:linux  # Linux AppImage
 
 #### Usage
 
-1. Launch the app.
-2. Enter the room name and select the session sample rate.
-3. Click **Join** — audio will play automatically when performers send sound.
+1. Install SuperCollider on your machine.
+2. Launch Radio SCOSC.
+3. Enter the hub server address, room name, and sample rate.
+4. Click **Join** — sclang starts automatically and audio plays when performers send sound.
 
-> **Important:** Set your OS audio output sample rate to match the session rate before launching the app. On Linux, ensure JACK is running at the same rate.
+> **Important:** Set your OS audio sample rate to match the session rate before launching. On Linux, ensure JACK is running at the same rate.
 
 ---
 

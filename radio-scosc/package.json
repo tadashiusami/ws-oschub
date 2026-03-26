@@ -1,7 +1,7 @@
 {
-    "name": "radio-scosc-listener",
+    "name": "radio-scosc",
     "version": "0.1.0",
-    "description": "Radio SCOSC Listener — audience client for Radio SCOSC sessions",
+    "description": "Radio SCOSC — audience client for WebSocket OSC Hub sessions",
     "main": "main.js",
     "scripts": {
         "start": "electron .",
@@ -17,18 +17,9 @@
         "electron-builder": "^24.0.0"
     },
     "build": {
-        "appId": "asia.oschub.radio-scosc-listener",
-        "productName": "Radio SCOSC Listener",
-        "files": [
-            "**/*"
-        ],
-        "extraResources": [
-            {
-                "from": "sc/",
-                "to": "sc/",
-                "filter": ["**/*"]
-            }
-        ],
+        "appId": "asia.oschub.radio-scosc",
+        "productName": "Radio SCOSC",
+        "files": ["**/*"],
         "mac": {
             "target": "dmg",
             "category": "public.app-category.music"

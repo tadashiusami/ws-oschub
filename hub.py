@@ -1,6 +1,6 @@
 """
 hub.py - WebSocket hub server for Radio SCOSC
-Relays OSC messages between performers via WebSocket.
+Relays OSC binary frames between performers via WebSocket.
 
 Usage:
     python hub.py [--host HOST] [--port PORT]
@@ -21,9 +21,16 @@ args = parser.parse_args()
 rooms: dict[str, dict] = {}
 
 
-async def send(ws, data: dict):
+async def send_text(ws, data: dict):
     try:
         await ws.send(json.dumps(data))
+    except Exception:
+        pass
+
+
+async def send_binary(ws, data: bytes):
+    try:
+        await ws.send(data)
     except Exception:
         pass
 
@@ -31,7 +38,7 @@ async def send(ws, data: dict):
 async def broadcast_info(room, message, exclude=None):
     for ws in list(rooms.get(room, {}).keys()):
         if ws != exclude:
-            await send(ws, {"type": "info", "message": message})
+            await send_text(ws, {"type": "info", "message": message})
 
 
 async def handler(ws):
@@ -42,9 +49,15 @@ async def handler(ws):
     name = None
 
     try:
+        # First message must be a JSON join
         raw = await asyncio.wait_for(ws.recv(), timeout=10)
-        data = json.loads(raw)
 
+        if isinstance(raw, bytes):
+            print(f"Invalid first message (binary) from {client_ip}")
+            await ws.close()
+            return
+
+        data = json.loads(raw)
         if data.get("type") != "join":
             print(f"Invalid first message from {client_ip}: {data}")
             await ws.close()
@@ -60,26 +73,19 @@ async def handler(ws):
         member_names = list(rooms[room].values())
         print(f"[+] '{name}' joined '{room}' | members: {member_names}")
 
-        await send(ws, {
+        await send_text(ws, {
             "type": "info",
             "message": f"Members in '{room}': {', '.join(member_names)}"
         })
         await broadcast_info(room, f"{name} joined", exclude=ws)
 
+        # Relay subsequent binary OSC frames as-is
         async for message in ws:
-            data = json.loads(message)
-
-            if data["type"] == "osc":
-                payload = json.dumps({
-                    "type": "osc",
-                    "from": name,
-                    "address": data["address"],
-                    "args": data["args"]
-                })
+            if isinstance(message, bytes):
                 targets = [c for c in rooms[room] if c != ws]
                 if targets:
                     await asyncio.gather(
-                        *[c.send(payload) for c in targets],
+                        *[send_binary(c, message) for c in targets],
                         return_exceptions=True
                     )
 
