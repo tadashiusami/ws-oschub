@@ -256,3 +256,18 @@ Common rates: **44100**, **48000**, **96000** Hz.
 ## License
 
 WebSocket OSC Hub is released under the [GNU General Public License v3.0](LICENSE), in accordance with SuperCollider.
+
+#### Using Radio SCOSC as a performer
+
+Radio SCOSC also listens on UDP port 57121 for OSC from SC, forwarding it to the hub. This means performers can use Radio SCOSC instead of local.py:
+
+```supercollider
+// Send OSC to Radio SCOSC (port 57121) instead of local.py
+~hub = NetAddr("127.0.0.1", 57121);
+~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440, amp=0.2|
+    Out.ar(0, SinOsc.ar(freq) * amp * EnvGen.kr(Env.perc, doneAction:2))
+}).asBytes);
+~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
+```
+
+The OSCdef set up automatically on join handles incoming OSC from other performers, so no additional setup is needed.
