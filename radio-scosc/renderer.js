@@ -10,7 +10,7 @@ const STATUS_LABELS = {
     connecting:   'Connecting...',
     connected:    'Receiving performance',
     disconnected: 'Disconnected — reconnecting...',
-    error:        'Error: scsynth stopped'
+    error:        'Error: sclang stopped'
 };
 
 joinBtn.addEventListener('click', () => {

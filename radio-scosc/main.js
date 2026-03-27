@@ -5,8 +5,8 @@
  * hub server via WebSocket. Received OSC binary frames are forwarded to
  * sclang via UDP, which relays them to scsynth via OSCdef.
  *
- * In Performer mode, also listens on UDP port 57121 for OSC from SC
- * and forwards it to the hub — no local.py required.
+ * Also listens on UDP port 57121 for OSC from SC and forwards it to the hub,
+ * so performers can use Radio SCOSC instead of local.py.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -19,20 +19,19 @@ const dgram = require('dgram');
 
 // --- Configuration ---
 const SC_PORT      = 57120;   // sclang receive port (hub → SC)
-const OSC_IN_PORT  = 57121;   // listens for OSC from SC (performer mode only)
+const OSC_IN_PORT  = 57121;   // listens for OSC from SC (SC → hub)
 const RECONNECT_MS = 3000;
 
 const MY_NAME = 'User-' + Math.floor(Math.random() * 1000);
 let HUB_URL    = '';
 let roomName   = null;
 let sampleRate = 48000;
-let role       = 'listener';  // 'listener' | 'performer'
 
 let mainWindow;
 let sclangProcess;
 let wsClient;
-let udpServer = null;
 const udpClient = dgram.createSocket('udp4');
+const udpServer = dgram.createSocket('udp4');
 
 // =========================================
 // sclang path detection
@@ -78,7 +77,7 @@ function getSclangPath() {
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 480,
-        height: 420,
+        height: 400,
         resizable: false,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
@@ -91,17 +90,13 @@ function createWindow() {
 // =========================================
 // IPC
 // =========================================
-ipcMain.on('join-room', (event, { hub, room, rate, userRole }) => {
+ipcMain.on('join-room', (event, { hub, room, rate }) => {
     HUB_URL    = hub;
     roomName   = room;
     sampleRate = rate;
-    role       = userRole;
-
     startSclang(rate, () => {
         connectToHub();
-        if (role === 'performer') {
-            startUdpServer();
-        }
+        startUdpServer();
     });
 });
 
@@ -172,14 +167,11 @@ function startSclang(rate, onReady) {
 }
 
 // =========================================
-// UDP server — performer mode only
+// UDP server (SC → Radio SCOSC → hub)
 // =========================================
 function startUdpServer() {
-    udpServer = dgram.createSocket('udp4');
-
     udpServer.bind(OSC_IN_PORT, '127.0.0.1', () => {
         console.log(`UDP server listening on port ${OSC_IN_PORT} (SC → hub)`);
-        sendToUI('log', `Performer mode: SC → port ${OSC_IN_PORT} → hub`);
     });
 
     udpServer.on('message', (msg) => {
@@ -206,8 +198,7 @@ function connectToHub() {
         wsClient.send(JSON.stringify({
             type: 'join',
             name: MY_NAME,
-            room: roomName,
-            role: role
+            room: roomName
         }));
     });
 
@@ -257,7 +248,7 @@ app.whenReady().then(() => {
 app.on('window-all-closed', () => {
     if (sclangProcess) sclangProcess.kill();
     udpClient.close();
-    if (udpServer) udpServer.close();
+    udpServer.close();
     if (process.platform !== 'darwin') app.quit();
 });
 
