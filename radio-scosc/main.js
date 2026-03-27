@@ -1,17 +1,19 @@
 /**
  * main.js - Electron main process for Radio SCOSC
  *
- * Behaviour depends on whether scsynth is already running:
+ * Behaviour depends on whether scsynth is already running when Join is pressed:
  *
  * Listener mode (scsynth NOT running):
  *   - Launches sclang + scsynth automatically.
  *   - Sets up OSCdef(\remoteProxy) automatically.
  *   - Forwards hub OSC to port 57110 (scsynth directly).
+ *   - Quits scsynth on app exit.
  *
  * Performer mode (scsynth already running):
  *   - Does NOT launch sclang.
  *   - Forwards hub OSC to port 57120 (existing sclang).
  *   - The performer must run OSCdef(\remoteProxy) manually in their editor.
+ *   - Does NOT quit scsynth on app exit.
  *
  * In both modes, listens on UDP port 57121 for OSC from SC and forwards
  * it to the hub, so performers can use Radio SCOSC instead of local.py.
@@ -26,16 +28,17 @@ const WebSocket = require('ws');
 const dgram = require('dgram');
 
 // --- Configuration ---
-const SCSYNTH_PORT  = 57110;  // scsynth OSC port
-const SCLANG_PORT   = 57120;  // sclang OSC port
-const OSC_IN_PORT   = 57121;  // listens for OSC from SC (SC → hub)
-const RECONNECT_MS  = 3000;
+const SCSYNTH_PORT = 57110;  // scsynth OSC port
+const SCLANG_PORT  = 57120;  // sclang OSC port
+const OSC_IN_PORT  = 57121;  // listens for OSC from SC (SC → hub)
+const RECONNECT_MS = 3000;
 
 const MY_NAME = 'User-' + Math.floor(Math.random() * 1000);
-let HUB_URL    = '';
-let roomName   = null;
-let sampleRate = 48000;
-let scReceivePort = SCLANG_PORT;  // updated based on mode
+let HUB_URL       = '';
+let roomName      = null;
+let sampleRate    = 48000;
+let scReceivePort = SCLANG_PORT;   // updated based on mode
+let launchedScsynth = false;       // true only if Radio SCOSC started scsynth
 
 let mainWindow;
 let sclangProcess;
@@ -119,6 +122,19 @@ function checkScsynth() {
 }
 
 // =========================================
+// Quit scsynth via OSC /quit
+// =========================================
+function quitScsynth() {
+    return new Promise((resolve) => {
+        const quit = Buffer.from([
+            0x2f, 0x71, 0x75, 0x69, 0x74, 0x00, 0x00, 0x00,  // '/quit\0\0\0'
+            0x2c, 0x00, 0x00, 0x00                              // ',\0\0\0'
+        ]);
+        udpClient.send(quit, SCSYNTH_PORT, '127.0.0.1', () => resolve());
+    });
+}
+
+// =========================================
 // Window
 // =========================================
 function createWindow() {
@@ -146,14 +162,16 @@ ipcMain.on('join-room', async (event, { hub, room, rate }) => {
 
     if (scsynthRunning) {
         // Performer mode: scsynth already running
-        scReceivePort = SCLANG_PORT;  // forward hub OSC to sclang (57120)
+        launchedScsynth = false;
+        scReceivePort   = SCLANG_PORT;  // forward hub OSC to sclang (57120)
         sendToUI('log', 'scsynth already running — performer mode.');
         sendToUI('log', 'Please run OSCdef(\\remoteProxy, ...) in your SC editor.');
         connectToHub();
         startUdpServer();
     } else {
         // Listener mode: launch sclang + scsynth
-        scReceivePort = SCSYNTH_PORT;  // forward hub OSC directly to scsynth (57110)
+        launchedScsynth = true;
+        scReceivePort   = SCSYNTH_PORT;  // forward hub OSC directly to scsynth (57110)
         sendToUI('log', 'scsynth not found — launching sclang (listener mode).');
         startSclang(rate, () => {
             connectToHub();
@@ -306,8 +324,14 @@ app.whenReady().then(() => {
     createWindow();
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
     if (sclangProcess) sclangProcess.kill();
+
+    // Only quit scsynth if Radio SCOSC started it (listener mode)
+    if (launchedScsynth) {
+        await quitScsynth();
+    }
+
     udpClient.close();
     udpServer.close();
     if (process.platform !== 'darwin') app.quit();
