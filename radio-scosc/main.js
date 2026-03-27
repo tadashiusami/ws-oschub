@@ -1,12 +1,15 @@
 /**
  * main.js - Electron main process for Radio SCOSC
  *
- * Launches sclang (SuperCollider must be installed) and connects to the
- * hub server via WebSocket. Received OSC binary frames are forwarded to
- * sclang via UDP, which relays them to scsynth via OSCdef.
+ * Behaviour depends on whether scsynth is already running:
  *
- * Also listens on UDP port 57121 for OSC from SC and forwards it to the hub,
- * so performers can use Radio SCOSC instead of local.py.
+ * - scsynth NOT running (listener): launches sclang + scsynth automatically.
+ * - scsynth already running (performer): connects to the existing server and
+ *   sets up OSCdef only. The performer must boot the SC server before
+ *   launching Radio SCOSC.
+ *
+ * In both cases, listens on UDP port 57121 for OSC from SC and forwards
+ * it to the hub, so performers can use Radio SCOSC instead of local.py.
  */
 
 const { app, BrowserWindow, ipcMain } = require('electron');
@@ -19,6 +22,7 @@ const dgram = require('dgram');
 
 // --- Configuration ---
 const SC_PORT      = 57120;   // sclang receive port (hub → SC)
+const SCSYNTH_PORT = 57110;   // scsynth OSC port (used for status check)
 const OSC_IN_PORT  = 57121;   // listens for OSC from SC (SC → hub)
 const RECONNECT_MS = 3000;
 
@@ -72,6 +76,43 @@ function getSclangPath() {
 }
 
 // =========================================
+// Check if scsynth is already running
+// =========================================
+function checkScsynth() {
+    return new Promise((resolve) => {
+        const checker = dgram.createSocket('udp4');
+        let responded = false;
+
+        // Minimal OSC /status message
+        const status = Buffer.from([
+            0x2f, 0x73, 0x74, 0x61, 0x74, 0x75, 0x73, 0x00,  // '/status\0'
+            0x2c, 0x00, 0x00, 0x00                              // ',\0\0\0'
+        ]);
+
+        checker.on('message', () => {
+            responded = true;
+            try { checker.close(); } catch {}
+            resolve(true);
+        });
+
+        checker.on('error', () => {
+            try { checker.close(); } catch {}
+            resolve(false);
+        });
+
+        checker.bind(() => {
+            checker.send(status, SCSYNTH_PORT, '127.0.0.1');
+            setTimeout(() => {
+                if (!responded) {
+                    try { checker.close(); } catch {}
+                    resolve(false);
+                }
+            }, 500);
+        });
+    });
+}
+
+// =========================================
 // Window
 // =========================================
 function createWindow() {
@@ -90,22 +131,36 @@ function createWindow() {
 // =========================================
 // IPC
 // =========================================
-ipcMain.on('join-room', (event, { hub, room, rate }) => {
-    HUB_URL    = hub;
+ipcMain.on('join-room', async (event, { hub, room, rate }) => {
+    // Auto-prepend wss:// if missing
+    HUB_URL    = hub.startsWith('ws') ? hub : 'wss://' + hub;
     roomName   = room;
     sampleRate = rate;
-    startSclang(rate, () => {
-        connectToHub();
-        startUdpServer();
-    });
+
+    const scsynthRunning = await checkScsynth();
+
+    if (scsynthRunning) {
+        // Performer: scsynth already running — set up OSCdef only
+        sendToUI('log', 'scsynth already running — connecting to existing server (performer mode).');
+        startSclangOSCdefOnly(() => {
+            connectToHub();
+            startUdpServer();
+        });
+    } else {
+        // Listener: launch sclang + scsynth
+        sendToUI('log', 'scsynth not found — launching sclang (listener mode).');
+        startSclang(rate, () => {
+            connectToHub();
+            startUdpServer();
+        });
+    }
 });
 
 // =========================================
-// sclang
+// sclang: full boot (listener)
 // =========================================
 function startSclang(rate, onReady) {
     const sclangPath = getSclangPath();
-
     if (!sclangPath) {
         sendToUI('log', '⚠ sclang not found. Please install SuperCollider.');
         sendToUI('status', 'error');
@@ -125,6 +180,41 @@ function startSclang(rate, onReady) {
         `});`
     ].join('\n');
 
+    launchSclang(initCode, onReady);
+}
+
+// =========================================
+// sclang: OSCdef only (performer)
+// =========================================
+function startSclangOSCdefOnly(onReady) {
+    const sclangPath = getSclangPath();
+    if (!sclangPath) {
+        sendToUI('log', '⚠ sclang not found. Please install SuperCollider.');
+        sendToUI('status', 'error');
+        return;
+    }
+
+    console.log(`Starting sclang (OSCdef only): ${sclangPath}`);
+    sendToUI('log', `Starting sclang: ${sclangPath}`);
+
+    // Connect to already-running scsynth and set up OSCdef
+    const initCode = [
+        `s.waitForBoot({`,
+        `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
+        `        s.addr.sendMsg(*msg);`,
+        `    }, '/remote');`,
+        `    "Radio SCOSC ready".postln;`,
+        `});`
+    ].join('\n');
+
+    launchSclang(initCode, onReady);
+}
+
+// =========================================
+// Common sclang launcher
+// =========================================
+function launchSclang(initCode, onReady) {
+    const sclangPath = getSclangPath();
     const tmpFile = path.join(os.tmpdir(), 'radio-scosc-init.scd');
     fs.writeFileSync(tmpFile, initCode);
 
@@ -144,7 +234,6 @@ function startSclang(rate, onReady) {
         const msg = d.toString().trim();
         console.log(`[sclang] ${msg}`);
         sendToUI('log', msg);
-
         if (!ready && msg.includes('Radio SCOSC ready')) {
             clearTimeout(timeout);
             ready = true;

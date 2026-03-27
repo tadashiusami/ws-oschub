@@ -31,7 +31,7 @@ websocket-osc-hub/
 ├── requirements.txt  # Python dependencies
 ├── LICENSE
 ├── README.md
-└── radio-scosc/      # Radio SCOSC listener app (Electron)
+└── radio-scosc/      # Radio SCOSC app (Electron)
     ├── main.js
     ├── preload.js
     ├── renderer.html
@@ -52,7 +52,7 @@ websocket-osc-hub/
 - Python 3.10+
 - SuperCollider 3.x
 
-### Radio SCOSC listener app
+### Radio SCOSC
 - **SuperCollider 3.x** (required — sclang is launched automatically)
 - Node.js 18+ (development/build only)
 
@@ -153,29 +153,24 @@ OSCdef(\remoteProxy, { |msg, time, addr|
 }, '/remote');
 ```
 
-A typical session setup looks like this:
+A typical session setup:
 
 ```supercollider
-// 1. Boot the server
 s.waitForBoot({
 
-    // 2. Set up the remote proxy
+    // 1. Set up the remote proxy
     OSCdef(\remoteProxy, { |msg, time, addr|
         s.addr.sendMsg(*msg);
     }, '/remote');
 
-    // 3. Send your SynthDef to all participants
+    // 2. Send your SynthDef to all participants
     ~hub = NetAddr("127.0.0.1", 57121);
     ~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440, amp=0.2|
         Out.ar(0, SinOsc.ar(freq) * amp * EnvGen.kr(Env.perc, doneAction:2))
     }).asBytes);
 
-    // 4. Play — sendBundle keeps timing tight across the network
-    // The timetag offset should be larger than the maximum network latency
-    // (0.3s is a safe default for domestic sessions)
+    // 3. Play with sendBundle for tight timing across the network
     ~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
-    ~hub.sendBundle(0.3, ["/n_set", 2000, \freq, 648]);
-    ~hub.sendBundle(0.3, ["/n_free", 2000]);
 });
 ```
 
@@ -183,11 +178,40 @@ s.waitForBoot({
 
 ---
 
-### 3. Radio SCOSC (listener app)
+### 3. Radio SCOSC
+
+Radio SCOSC can be used by both listeners and performers.
+
+#### Automatic mode detection
+
+Radio SCOSC checks whether scsynth is already running on startup:
+
+| Situation | Behaviour | Intended for |
+|-----------|-----------|--------------|
+| scsynth **not** running | Launches sclang + scsynth automatically | **Listener** |
+| scsynth **already** running | Connects to existing server, sets up OSCdef only | **Performer** |
+
+#### For performers using Radio SCOSC
+
+Performers can use Radio SCOSC instead of local.py. In this case:
+
+- **Boot the SC server first** in your editor (SCIDE, vim/scnvim, Emacs/scel, Overtone, Supriya, etc.) before launching Radio SCOSC.
+- Radio SCOSC detects the running scsynth and sets up `OSCdef(\remoteProxy)` automatically — no manual OSCdef is needed.
+- Send OSC to port 57121 (Radio SCOSC) instead of local.py:
+
+```supercollider
+~hub = NetAddr("127.0.0.1", 57121);
+~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440, amp=0.2|
+    Out.ar(0, SinOsc.ar(freq) * amp * EnvGen.kr(Env.perc, doneAction:2))
+}).asBytes);
+~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
+```
+
+> **Important for performers:** Always boot the SC server in your editor **before** launching Radio SCOSC. If Radio SCOSC is launched without a running scsynth, it will start its own scsynth instance, which will conflict with your editor's server.
 
 #### Prerequisites
 
-- **SuperCollider must be installed** on the listener's machine.
+- **SuperCollider must be installed** on the machine.
 - Radio SCOSC detects sclang automatically at the following default paths:
 
 | Platform | Default path |
@@ -195,22 +219,6 @@ s.waitForBoot({
 | macOS | `/Applications/SuperCollider.app/Contents/MacOS/sclang` |
 | Windows | `C:\Program Files\SuperCollider\sclang.exe` |
 | Linux | detected via `which sclang` |
-
-#### How it works
-
-1. On **Join**, Radio SCOSC launches sclang with an init script.
-2. sclang boots scsynth and automatically sets up the following OSCdef:
-
-```supercollider
-OSCdef(\remoteProxy, { |msg, time, addr|
-    s.addr.sendMsg(*msg);
-}, '/remote');
-```
-
-3. Radio SCOSC connects to the hub and forwards received OSC binary frames to sclang via UDP (port 57120).
-4. The OSCdef relays all incoming OSC to scsynth, so audio plays automatically.
-
-No SC coding is required on the listener's side.
 
 #### Run (development)
 
@@ -230,12 +238,11 @@ npm run build:linux  # Linux AppImage
 
 #### Usage
 
-1. Install SuperCollider on your machine.
-2. Launch Radio SCOSC.
-3. Enter the hub server address, room name, and sample rate.
-4. Click **Join** — sclang starts automatically and audio plays when performers send sound.
-
-> **Important:** Set your OS audio sample rate to match the session rate before launching. On Linux, ensure JACK is running at the same rate.
+1. Install SuperCollider.
+2. *(Performer only)* Boot the SC server in your editor first.
+3. Launch Radio SCOSC.
+4. Enter the hub server address (e.g. `wss://live.example.com` or just `live.example.com`), room name, and sample rate.
+5. Click **Join**.
 
 ---
 
@@ -256,18 +263,3 @@ Common rates: **44100**, **48000**, **96000** Hz.
 ## License
 
 WebSocket OSC Hub is released under the [GNU General Public License v3.0](LICENSE), in accordance with SuperCollider.
-
-#### Using Radio SCOSC as a performer
-
-Radio SCOSC also listens on UDP port 57121 for OSC from SC, forwarding it to the hub. This means performers can use Radio SCOSC instead of local.py:
-
-```supercollider
-// Send OSC to Radio SCOSC (port 57121) instead of local.py
-~hub = NetAddr("127.0.0.1", 57121);
-~hub.sendMsg("/d_recv", SynthDef(\sine, { |freq=440, amp=0.2|
-    Out.ar(0, SinOsc.ar(freq) * amp * EnvGen.kr(Env.perc, doneAction:2))
-}).asBytes);
-~hub.sendBundle(0.3, ["/s_new", \sine, 2000, 0, 0, \freq, 432]);
-```
-
-The OSCdef set up automatically on join handles incoming OSC from other performers, so no additional setup is needed.
