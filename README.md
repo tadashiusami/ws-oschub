@@ -187,8 +187,8 @@ Radio SCOSC checks whether scsynth is already running when Join is pressed:
 
 | Situation | Mode | Behaviour |
 |-----------|------|-----------|
-| scsynth **not** running | **Listener** | Launches sclang + scsynth automatically. Sets up OSCdef automatically. Forwards hub OSC to port 57110 (scsynth directly). |
-| scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to port 57120 (existing sclang). OSCdef must be run manually in the editor. |
+| scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC directly to scsynth (port 57110). sclang is only used to start scsynth and is not involved in OSC routing. |
+| scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to the existing sclang (port 57120). OSCdef must be run manually in the editor to relay OSC to scsynth. |
 
 In both modes, Radio SCOSC also listens on UDP port 57121 for OSC from SC and forwards it to the hub.
 
