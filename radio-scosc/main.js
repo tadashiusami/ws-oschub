@@ -3,12 +3,17 @@
  *
  * Behaviour depends on whether scsynth is already running:
  *
- * - scsynth NOT running (listener): launches sclang + scsynth automatically.
- * - scsynth already running (performer): connects to the existing server and
- *   sets up OSCdef only. The performer must boot the SC server before
- *   launching Radio SCOSC.
+ * Listener mode (scsynth NOT running):
+ *   - Launches sclang + scsynth automatically.
+ *   - Sets up OSCdef(\remoteProxy) automatically.
+ *   - Forwards hub OSC to port 57110 (scsynth directly).
  *
- * In both cases, listens on UDP port 57121 for OSC from SC and forwards
+ * Performer mode (scsynth already running):
+ *   - Does NOT launch sclang.
+ *   - Forwards hub OSC to port 57120 (existing sclang).
+ *   - The performer must run OSCdef(\remoteProxy) manually in their editor.
+ *
+ * In both modes, listens on UDP port 57121 for OSC from SC and forwards
  * it to the hub, so performers can use Radio SCOSC instead of local.py.
  */
 
@@ -21,15 +26,16 @@ const WebSocket = require('ws');
 const dgram = require('dgram');
 
 // --- Configuration ---
-const SC_PORT      = 57120;   // sclang receive port (hub → SC)
-const SCSYNTH_PORT = 57110;   // scsynth OSC port (used for status check)
-const OSC_IN_PORT  = 57121;   // listens for OSC from SC (SC → hub)
-const RECONNECT_MS = 3000;
+const SCSYNTH_PORT  = 57110;  // scsynth OSC port
+const SCLANG_PORT   = 57120;  // sclang OSC port
+const OSC_IN_PORT   = 57121;  // listens for OSC from SC (SC → hub)
+const RECONNECT_MS  = 3000;
 
 const MY_NAME = 'User-' + Math.floor(Math.random() * 1000);
 let HUB_URL    = '';
 let roomName   = null;
 let sampleRate = 48000;
+let scReceivePort = SCLANG_PORT;  // updated based on mode
 
 let mainWindow;
 let sclangProcess;
@@ -132,7 +138,6 @@ function createWindow() {
 // IPC
 // =========================================
 ipcMain.on('join-room', async (event, { hub, room, rate }) => {
-    // Auto-prepend wss:// if missing
     HUB_URL    = hub.startsWith('ws') ? hub : 'wss://' + hub;
     roomName   = room;
     sampleRate = rate;
@@ -140,14 +145,15 @@ ipcMain.on('join-room', async (event, { hub, room, rate }) => {
     const scsynthRunning = await checkScsynth();
 
     if (scsynthRunning) {
-        // Performer: scsynth already running — set up OSCdef only
-        sendToUI('log', 'scsynth already running — connecting to existing server (performer mode).');
-        startSclangOSCdefOnly(() => {
-            connectToHub();
-            startUdpServer();
-        });
+        // Performer mode: scsynth already running
+        scReceivePort = SCLANG_PORT;  // forward hub OSC to sclang (57120)
+        sendToUI('log', 'scsynth already running — performer mode.');
+        sendToUI('log', 'Please run OSCdef(\\remoteProxy, ...) in your SC editor.');
+        connectToHub();
+        startUdpServer();
     } else {
-        // Listener: launch sclang + scsynth
+        // Listener mode: launch sclang + scsynth
+        scReceivePort = SCSYNTH_PORT;  // forward hub OSC directly to scsynth (57110)
         sendToUI('log', 'scsynth not found — launching sclang (listener mode).');
         startSclang(rate, () => {
             connectToHub();
@@ -157,7 +163,7 @@ ipcMain.on('join-room', async (event, { hub, room, rate }) => {
 });
 
 // =========================================
-// sclang: full boot (listener)
+// sclang: full boot (listener mode only)
 // =========================================
 function startSclang(rate, onReady) {
     const sclangPath = getSclangPath();
@@ -180,41 +186,6 @@ function startSclang(rate, onReady) {
         `});`
     ].join('\n');
 
-    launchSclang(initCode, onReady);
-}
-
-// =========================================
-// sclang: OSCdef only (performer)
-// =========================================
-function startSclangOSCdefOnly(onReady) {
-    const sclangPath = getSclangPath();
-    if (!sclangPath) {
-        sendToUI('log', '⚠ sclang not found. Please install SuperCollider.');
-        sendToUI('status', 'error');
-        return;
-    }
-
-    console.log(`Starting sclang (OSCdef only): ${sclangPath}`);
-    sendToUI('log', `Starting sclang: ${sclangPath}`);
-
-    // Connect to already-running scsynth and set up OSCdef
-    const initCode = [
-        `s.waitForBoot({`,
-        `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
-        `        s.addr.sendMsg(*msg);`,
-        `    }, '/remote');`,
-        `    "Radio SCOSC ready".postln;`,
-        `});`
-    ].join('\n');
-
-    launchSclang(initCode, onReady);
-}
-
-// =========================================
-// Common sclang launcher
-// =========================================
-function launchSclang(initCode, onReady) {
-    const sclangPath = getSclangPath();
     const tmpFile = path.join(os.tmpdir(), 'radio-scosc-init.scd');
     fs.writeFileSync(tmpFile, initCode);
 
@@ -293,7 +264,8 @@ function connectToHub() {
 
     wsClient.on('message', (raw) => {
         if (raw instanceof Buffer) {
-            udpClient.send(raw, SC_PORT, '127.0.0.1', (err) => {
+            // Forward to scsynth (listener) or sclang (performer)
+            udpClient.send(raw, scReceivePort, '127.0.0.1', (err) => {
                 if (err) console.error('UDP send error:', err);
             });
         } else {
