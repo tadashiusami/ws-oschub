@@ -280,20 +280,22 @@ function connectToHub() {
         }));
     });
 
-    wsClient.on('message', (raw) => {
-        if (raw instanceof Buffer) {
-            // Forward to scsynth (listener) or sclang (performer)
-            udpClient.send(raw, scReceivePort, '127.0.0.1', (err) => {
-                if (err) console.error('UDP send error:', err);
-            });
-        } else {
+    wsClient.on('message', (raw, isBinary) => {
+        if (!isBinary) {
+            // Text frame — info message from hub
             let data;
-            try { data = JSON.parse(raw); }
+            try { data = JSON.parse(raw.toString()); }
             catch { return; }
             if (data.type === 'info') {
                 sendToUI('status', 'connected');
                 sendToUI('log', data.message);
             }
+        } else {
+            // Binary frame — raw OSC data
+            // Forward to scsynth (listener) or sclang (performer)
+            udpClient.send(raw, scReceivePort, '127.0.0.1', (err) => {
+                if (err) console.error('UDP send error:', err);
+            });
         }
     });
 
