@@ -205,6 +205,8 @@ OSCdef(\remoteProxy, { |msg, time, addr|
 }, '/remote');
 ```
 
+> **Overtone / Supriya users:** The OSCdef approach above is specific to sclang. OSC handling varies by implementation in Overtone and Supriya. Refer to each project's documentation for the appropriate OSC receive patterns.
+
 3. Launch Radio SCOSC and join the session.
 4. Send OSC to port 57121 (Radio SCOSC) instead of local.py:
 
