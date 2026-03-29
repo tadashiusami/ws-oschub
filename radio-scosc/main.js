@@ -199,7 +199,7 @@ function startSclang(rate, onReady) {
         `s.waitForBoot({`,
         `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
         `        s.addr.sendMsg(*msg);`,
-        `    }, '/remote');`,
+        `    }, nil);`,
         `    "Radio SCOSC ready".postln;`,
         `});`
     ].join('\n');

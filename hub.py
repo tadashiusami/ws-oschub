@@ -3,7 +3,7 @@ hub.py - WebSocket hub server for Radio SCOSC
 Relays OSC binary frames between performers via WebSocket.
 
 Usage:
-    python hub.py [--host HOST] [--port PORT]
+    python hub.py [--host HOST] [--port PORT] [--no-rewrite]
 """
 
 import asyncio
@@ -15,7 +15,48 @@ import argparse
 parser = argparse.ArgumentParser(description="OSC WebSocket hub for Radio SCOSC")
 parser.add_argument("--host", default="0.0.0.0", help="Bind address (default: 0.0.0.0)")
 parser.add_argument("--port", type=int, default=8765, help="Port (default: 8765)")
+parser.add_argument("--no-rewrite", action="store_true",
+                    help="Disable OSC address rewriting (pass frames through verbatim)")
 args = parser.parse_args()
+
+
+# --- OSC address rewriting ---
+
+def _pad4(n: int) -> int:
+    """Round n up to the nearest multiple of 4 (OSC alignment)."""
+    return (n + 3) & ~3
+
+
+def rewrite_osc_address(data: bytes, sender_name: str) -> bytes:
+    """Rewrite an OSC message address from /addr to /remote/<sender_name>/addr.
+
+    OSC bundles (starting with '#bundle') are passed through unchanged to
+    preserve their timetags for synchronized playback.
+    Returns the original data unchanged on any parse error.
+    """
+    if len(data) < 4:
+        return data
+    # OSC bundles: pass through unchanged (timetag must be preserved)
+    if data[:7] == b'#bundle':
+        return data
+    # OSC messages must start with '/'
+    if data[0:1] != b'/':
+        return data
+    try:
+        null_pos = data.index(b'\x00')
+        original_addr = data[:null_pos].decode('utf-8')
+        old_padded = _pad4(null_pos + 1)
+
+        new_addr = f"/remote/{sender_name}{original_addr}"
+        new_addr_bytes = new_addr.encode('utf-8')
+        new_padded = _pad4(len(new_addr_bytes) + 1)
+
+        # Build padded address block (null-terminated, 4-byte aligned)
+        addr_block = new_addr_bytes + b'\x00' * (new_padded - len(new_addr_bytes))
+        return addr_block + data[old_padded:]
+    except (ValueError, UnicodeDecodeError):
+        return data
+
 
 # room name -> {ws: name}
 rooms: dict[str, dict] = {}
@@ -79,13 +120,14 @@ async def handler(ws):
         })
         await broadcast_info(room, f"{name} joined", exclude=ws)
 
-        # Relay subsequent binary OSC frames as-is
+        # Relay subsequent binary OSC frames (with optional address rewriting)
         async for message in ws:
             if isinstance(message, bytes):
                 targets = [c for c in rooms[room] if c != ws]
                 if targets:
+                    outgoing = message if args.no_rewrite else rewrite_osc_address(message, name)
                     await asyncio.gather(
-                        *[send_binary(c, message) for c in targets],
+                        *[send_binary(c, outgoing) for c in targets],
                         return_exceptions=True
                     )
 
