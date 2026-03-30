@@ -21,11 +21,36 @@ parser.add_argument("--no-rewrite", action="store_true",
 args = parser.parse_args()
 
 
-# --- OSC address rewriting ---
+# --- OSC helpers ---
 
 def _pad4(n: int) -> int:
     """Round n up to the nearest multiple of 4 (OSC alignment)."""
     return (n + 3) & ~3
+
+
+def parse_osc_address(data: bytes) -> str:
+    """Extract the OSC address string from a raw OSC message."""
+    if not data or data[0:1] != b'/':
+        return ''
+    try:
+        return data[:data.index(b'\x00')].decode('utf-8')
+    except (ValueError, UnicodeDecodeError):
+        return ''
+
+
+def encode_osc_string(s: str) -> bytes:
+    """Encode a string in OSC format (null-terminated, padded to 4 bytes)."""
+    b = s.encode('utf-8') + b'\x00'
+    return b + b'\x00' * ((4 - len(b) % 4) % 4)
+
+
+def build_osc_message(address: str, *args: str) -> bytes:
+    """Build a minimal OSC message with zero or more string arguments."""
+    msg = encode_osc_string(address)
+    msg += encode_osc_string(',' + 's' * len(args))
+    for arg in args:
+        msg += encode_osc_string(str(arg))
+    return msg
 
 
 def rewrite_bundle(data: bytes, sender_name: str) -> bytes:
@@ -156,13 +181,19 @@ async def handler(ws):
         # Relay subsequent binary OSC frames (with optional address rewriting)
         async for message in ws:
             if isinstance(message, bytes):
-                targets = [c for c in rooms[room] if c != ws]
-                if targets:
-                    outgoing = message if args.no_rewrite else rewrite_osc_address(message, name)
-                    await asyncio.gather(
-                        *[send_binary(c, outgoing) for c in targets],
-                        return_exceptions=True
-                    )
+                if parse_osc_address(message) == '/who':
+                    # Hub-only: reply with participant list, do not broadcast
+                    members = list(rooms[room].values())
+                    await send_binary(ws, build_osc_message('/who/reply', *members))
+                    print(f"[/who] Replied to '{name}' with {members}")
+                else:
+                    targets = [c for c in rooms[room] if c != ws]
+                    if targets:
+                        outgoing = message if args.no_rewrite else rewrite_osc_address(message, name)
+                        await asyncio.gather(
+                            *[send_binary(c, outgoing) for c in targets],
+                            return_exceptions=True
+                        )
 
     except asyncio.TimeoutError:
         print(f"[-] Timeout during join from {client_ip}")
