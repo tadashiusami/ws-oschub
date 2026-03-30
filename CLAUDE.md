@@ -37,25 +37,28 @@ npm run build:win     # NSIS installer
 1. Client connects and sends JSON join: `{"type": "join", "name": "...", "room": "..."}`
 2. Subsequent binary frames are OSC packets — hub rewrites the address before broadcasting:
    - OSC messages: `/original/addr` → `/remote/<sender_name>/original/addr`
-   - OSC bundles (`#bundle`): passed through unchanged (timetag preserved for sync)
+   - OSC bundles (`#bundle`): each contained message address is rewritten recursively; timetag is preserved
 3. Text frames from hub are info messages: `{"type": "info", "message": "..."}`
 
 **OSC address rewriting** (`hub.py`): the hub prefixes every outgoing OSC message address with `/remote/<sender_name>` so receivers can identify the sender without additional metadata. Disable with `--no-rewrite` for verbatim pass-through.
 
-SuperCollider performers can match incoming messages by sender:
+SuperCollider performers can match incoming messages by sender using the exact rewritten path:
 ```supercollider
 OSCdef(\aliceNote, { |msg| msg.postln }, '/remote/alice/note');
-// or match all remote messages:
-OSCdef(\anyRemote, { |msg| msg.postln }, '/remote');  // SC prefix match
+// or match all remote messages with nil (match-all) and filter manually:
+OSCdef(\anyRemote, { |msg|
+    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+    if(parts.size >= 3 && { parts[0] == "remote" }, { msg.postln });
+}, nil);
 ```
 
 **Port conventions:**
-- `57110` — scsynth (Radio SCOSC sends here in listener mode)
-- `57120` — sclang (Radio SCOSC sends here in performer mode; local.py default SC port)
+- `57110` — scsynth
+- `57120` — sclang (Radio SCOSC sends here in both modes; local.py default SC port)
 - `57121` — local UDP listener for OSC from SC → hub
 
 **Radio SCOSC mode detection** (`main.js`): sends an OSC `/status` ping to port 57110.
-- No response → **listener mode**: launches sclang, boots server, installs `OSCdef(\remoteProxy)`, routes hub OSC to scsynth (57110), quits scsynth on exit
+- No response → **listener mode**: launches sclang, boots server, installs `OSCdef(\remoteProxy)` (strips `/remote/<name>/` prefix and forwards to scsynth), routes hub OSC to sclang (57120), quits scsynth on exit
 - Response → **performer mode**: no sclang launch, routes hub OSC to sclang (57120), does not quit scsynth on exit
 
 **IPC flow** (Electron): `renderer.js` → `preload.js` context bridge → `main.js` IPC handler `join-room` → WebSocket + UDP I/O
@@ -63,7 +66,7 @@ OSCdef(\anyRemote, { |msg| msg.postln }, '/remote');  // SC prefix match
 ## Key Implementation Notes
 
 - OSC messages are rewritten by hub.py before broadcast: `/addr` → `/remote/<name>/addr`
-- OSC bundles are passed through verbatim (no rewriting) to preserve timetags
+- OSC bundles are rewritten recursively by hub.py — each contained message address is prefixed; timetag is preserved
 - `hub.py` uses `asyncio` + `websockets`; `local.py` uses a daemon thread for UDP + async WebSocket
 - Reconnection delay is fixed at 3 seconds in both `local.py` and `main.js`
 - All participants in a session must use the same sample rate (44100, 48000, or 96000 Hz)

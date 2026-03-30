@@ -182,7 +182,7 @@ ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
     } else {
         // Listener mode: auto-generate a listener name, ignore any entered name
         launchedScsynth = true;
-        scReceivePort   = SCSYNTH_PORT;  // forward hub OSC directly to scsynth (57110)
+        scReceivePort   = SCLANG_PORT;  // forward hub OSC to sclang (57120); OSCdef strips prefix
         myName = generateListenerName();
         sendToUI('log', `scsynth not found — launching sclang (listener mode, name: ${myName}).`);
         startSclang(rate, () => {
@@ -210,7 +210,11 @@ function startSclang(rate, onReady) {
         `s.options.sampleRate = ${rate};`,
         `s.waitForBoot({`,
         `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
-        `        s.addr.sendMsg(*msg);`,
+        `        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });`,
+        `        if(parts.size >= 3 && { parts[0] == "remote" }, {`,
+        `            var cmd = ("/" ++ parts[2..].join("/")).asSymbol;`,
+        `            s.addr.sendMsg(cmd, *msg[1..]);`,
+        `        });`,
         `    }, nil);`,
         `    "Radio SCOSC ready".postln;`,
         `});`

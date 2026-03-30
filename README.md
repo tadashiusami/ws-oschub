@@ -138,18 +138,24 @@ Options:
 | `--sc-port` | 57120 | SC receive port |
 | `--osc-port` | 57121 | Local OSC receive port |
 | `--rate` | 48000 | Session sample rate (for confirmation only) |
+| `--name` | *(prompted)* | Your name in the session |
+| `--room` | *(prompted)* | Room name to join |
 
-You will be prompted for your name and room name on startup.
+If `--name` or `--room` are omitted, you will be prompted for them on startup. Each participant's name must be unique within a room — if the name is already in use the hub will reject the connection.
 
 #### SuperCollider setup for performers
 
 Each performer must have the following OSCdef running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120) and forwards it to scsynth.
 
 ```supercollider
-// Receive OSC from remote performers and forward to scsynth
+// Receive OSC from remote performers, strip the /remote/<name>/ prefix, and forward to scsynth
 OSCdef(\remoteProxy, { |msg, time, addr|
-    s.addr.sendMsg(*msg);
-}, '/remote');
+    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+    if(parts.size >= 3 && { parts[0] == "remote" }, {
+        var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+        s.addr.sendMsg(cmd, *msg[1..]);
+    });
+}, nil);
 ```
 
 A typical session setup:
@@ -159,8 +165,12 @@ s.waitForBoot({
 
     // 1. Set up the remote proxy
     OSCdef(\remoteProxy, { |msg, time, addr|
-        s.addr.sendMsg(*msg);
-    }, '/remote');
+        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+        if(parts.size >= 3 && { parts[0] == "remote" }, {
+            var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    }, nil);
 
     // 2. Send your SynthDef to all participants
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -187,7 +197,7 @@ Radio SCOSC checks whether scsynth is already running when Join is pressed:
 
 | Situation | Mode | Behaviour |
 |-----------|------|-----------|
-| scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC directly to scsynth (port 57110). sclang is only used to start scsynth and is not involved in OSC routing. |
+| scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC to sclang (port 57120). sclang's `OSCdef(\remoteProxy)` strips the sender prefix and relays the original command to scsynth. |
 | scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to the existing sclang (port 57120). OSCdef must be run manually in the editor to relay OSC to scsynth. |
 
 In both modes, Radio SCOSC also listens on UDP port 57121 for OSC from SC and forwards it to the hub.
@@ -201,8 +211,12 @@ Performers can use Radio SCOSC instead of local.py. In this case:
 
 ```supercollider
 OSCdef(\remoteProxy, { |msg, time, addr|
-    s.addr.sendMsg(*msg);
-}, '/remote');
+    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+    if(parts.size >= 3 && { parts[0] == "remote" }, {
+        var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+        s.addr.sendMsg(cmd, *msg[1..]);
+    });
+}, nil);
 ```
 
 > **Overtone / Supriya users:** The OSCdef approach above is specific to sclang. OSC handling varies by implementation in Overtone and Supriya. Refer to each project's documentation for the appropriate OSC receive patterns.
@@ -253,7 +267,28 @@ npm run build:linux  # Linux AppImage
 2. *(Performer only)* Boot the SC server and run `OSCdef(\remoteProxy, ...)` in your editor first.
 3. Launch Radio SCOSC.
 4. Enter the hub server address (e.g. `wss://live.example.com` or just `live.example.com`), room name, and sample rate.
-5. Click **Join**.
+5. **Name field:**
+   - **Performer mode** (scsynth already running): enter your name. Must be unique in the room.
+   - **Listener mode** (scsynth not running): the name field is ignored — a random `listener-XXXX` name is assigned automatically.
+6. Click **Join**.
+
+#### /who command
+
+Any participant can query the current room membership by sending an OSC `/who` message to the hub:
+
+```supercollider
+~hub = NetAddr("127.0.0.1", 57121);
+~hub.sendMsg('/who');
+```
+
+The hub replies with a `/who/reply` OSC message containing the names of all current participants as string arguments:
+
+```supercollider
+OSCdef(\whoReply, { |msg|
+    var names = msg[1..];
+    ("Participants: " ++ names.join(", ")).postln;
+}, '/who/reply');
+```
 
 ---
 
