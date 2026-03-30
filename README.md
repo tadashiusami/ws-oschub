@@ -309,4 +309,3 @@ Common rates: **44100**, **48000**, **96000** Hz.
 ## License
 
 WebSocket OSC Hub is released under the [GNU General Public License v3.0](LICENSE), in accordance with SuperCollider.
-# test

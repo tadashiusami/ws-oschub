@@ -31,7 +31,9 @@ const dgram = require('dgram');
 const SCSYNTH_PORT = 57110;  // scsynth OSC port
 const SCLANG_PORT  = 57120;  // sclang OSC port
 const OSC_IN_PORT  = 57121;  // listens for OSC from SC (SC → hub)
-const RECONNECT_MS = 3000;
+
+let reconnectDelay    = 1000;
+const MAX_RECONNECT_DELAY = 30000;
 
 let myName        = null;
 let HUB_URL       = '';
@@ -289,6 +291,7 @@ function connectToHub() {
     wsClient = new WebSocket(HUB_URL);
 
     wsClient.on('open', () => {
+        reconnectDelay = 1000;  // reset backoff on successful connection
         console.log('Connected to hub');
         wsClient.send(JSON.stringify({
             type: 'join',
@@ -326,8 +329,9 @@ function connectToHub() {
             return;
         }
         sendToUI('status', 'disconnected');
-        console.log(`Disconnected. Reconnecting in ${RECONNECT_MS}ms...`);
-        setTimeout(connectToHub, RECONNECT_MS);
+        console.log(`Disconnected. Reconnecting in ${reconnectDelay / 1000}s...`);
+        setTimeout(connectToHub, reconnectDelay);
+        reconnectDelay = Math.min(reconnectDelay * 2, MAX_RECONNECT_DELAY);
     });
 
     wsClient.on('error', (err) => {
