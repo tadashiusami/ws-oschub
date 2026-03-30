@@ -76,10 +76,13 @@ async def ws_client():
                         # Forward binary OSC to SC via UDP
                         sc_send_sock.sendto(message, ("127.0.0.1", SC_RECEIVE_PORT))
                     else:
-                        # Text frames are info messages from hub
                         data = json.loads(message)
                         if data.get("type") == "info":
                             print(f"[info] {data['message']}")
+                        elif data.get("type") == "error":
+                            print(f"[error] {data['message']}", flush=True)
+                            # Name conflict is unrecoverable — exit to avoid infinite reconnect loop
+                            raise SystemExit(f"Disconnected: {data['message']}")
 
         except KeyboardInterrupt:
             print("Shutting down...")

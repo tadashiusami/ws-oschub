@@ -280,6 +280,7 @@ function startUdpServer() {
 // WebSocket connection
 // =========================================
 function connectToHub() {
+    let suppressReconnect = false;
     sendToUI('status', 'connecting');
     wsClient = new WebSocket(HUB_URL);
 
@@ -294,13 +295,17 @@ function connectToHub() {
 
     wsClient.on('message', (raw, isBinary) => {
         if (!isBinary) {
-            // Text frame — info message from hub
             let data;
             try { data = JSON.parse(raw.toString()); }
             catch { return; }
             if (data.type === 'info') {
                 sendToUI('status', 'connected');
                 sendToUI('log', data.message);
+            } else if (data.type === 'error') {
+                console.error(`[hub error] ${data.message}`);
+                sendToUI('log', `Error: ${data.message}`);
+                sendToUI('status', 'error');
+                suppressReconnect = true;  // hub closed the connection — don't loop
             }
         } else {
             // Binary frame — raw OSC data
@@ -312,6 +317,10 @@ function connectToHub() {
     });
 
     wsClient.on('close', () => {
+        if (suppressReconnect) {
+            console.log('Connection closed after hub error — not reconnecting.');
+            return;
+        }
         sendToUI('status', 'disconnected');
         console.log(`Disconnected. Reconnecting in ${RECONNECT_MS}ms...`);
         setTimeout(connectToHub, RECONNECT_MS);
