@@ -2,7 +2,7 @@
 
 **WebSocket OSC Hub** is a minimal system for sharing OSC messages between multiple [SuperCollider](https://supercollider.github.io/) instances over the internet via WebSocket.
 
-Performers send OSC commands (`/d_recv`, `/s_new`, `/n_set`, `/n_free`, `sendBundle`, etc.) from their local SC environment through a hub server, where they are broadcast to all other participants in the same room. OSC data is forwarded as raw binary, so all OSC message types including Bundles with timetags are supported.
+Performers send OSC commands (`/d_recv`, `/s_new`, `/n_set`, `/n_free`, `sendBundle`, etc.) from their local SC environment through a hub server, where they are broadcast to all other participants in the same room. OSC messages and Bundles are both supported — the hub rewrites addresses in each, while preserving timetags in Bundles for synchronised playback.
 
 An audience client (**Radio SCOSC**) allows listeners to join a session and hear the performance without any SC coding knowledge.
 
@@ -17,7 +17,7 @@ An audience client (**Radio SCOSC**) allows listeners to join a session and hear
                                      (Electron app — requires SuperCollider)
 ```
 
-OSC packets are forwarded as raw binary frames over WebSocket. The hub relays them without parsing. OSC Bundles with timetags are preserved, allowing performers to synchronise rhythm and tempo across remote locations using `sendBundle`.
+OSC packets are forwarded as binary frames over WebSocket. The hub rewrites the OSC address of each message to `/remote/<sender_name>/addr` before broadcasting. OSC Bundles are parsed recursively — each contained message address is rewritten while the bundle timetag is preserved, allowing performers to synchronise rhythm and tempo across remote locations using `sendBundle`.
 
 ---
 
