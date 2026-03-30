@@ -4,6 +4,7 @@ Forwards raw OSC binary between SuperCollider and the hub server.
 
 Usage:
     python local.py <server> [--port PORT] [--sc-port PORT] [--osc-port PORT] [--rate RATE]
+                             [--name NAME] [--room ROOM]
 """
 
 import asyncio
@@ -22,14 +23,16 @@ parser.add_argument("--osc-port", type=int, default=57121, help="Local OSC recei
 parser.add_argument("--rate", type=int, default=48000,
                     choices=[44100, 48000, 96000],
                     help="Sample rate for confirmation message (default: 48000)")
+parser.add_argument("--name", default=None, help="Your name (prompted if omitted)")
+parser.add_argument("--room", default=None, help="Room name (prompted if omitted)")
 args = parser.parse_args()
 
 SERVER_WS_URL   = f"wss://{args.server}:{args.port}"
 SC_RECEIVE_PORT = args.sc_port
 LOCAL_OSC_PORT  = args.osc_port
 
-MY_NAME = input("Your name: ").strip()
-MY_ROOM = input("Room name: ").strip()
+MY_NAME = args.name if args.name else input("Your name: ").strip()
+MY_ROOM = args.room if args.room else input("Room name: ").strip()
 print(f"Sample rate: {args.rate} Hz  — please boot SC server at the same rate.")
 
 ws_connection = None

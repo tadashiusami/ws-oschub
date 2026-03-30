@@ -3,6 +3,7 @@ const statusText = document.getElementById('status-text');
 const logEl      = document.getElementById('log');
 const hubInput   = document.getElementById('hub-input');
 const roomInput  = document.getElementById('room-input');
+const nameInput  = document.getElementById('name-input');
 const rateSelect = document.getElementById('rate-select');
 const joinBtn    = document.getElementById('join-btn');
 
@@ -16,18 +17,24 @@ const STATUS_LABELS = {
 joinBtn.addEventListener('click', () => {
     const hub  = hubInput.value.trim();
     const room = roomInput.value.trim();
+    const name = nameInput.value.trim();
     if (!hub || !room) return;
     const rate = parseInt(rateSelect.value);
     joinBtn.disabled    = true;
     hubInput.disabled   = true;
     roomInput.disabled  = true;
+    nameInput.disabled  = true;
     rateSelect.disabled = true;
     dot.className       = 'connecting';
     statusText.textContent = 'Connecting...';
-    window.api.joinRoom(hub, room, rate);
+    window.api.joinRoom(hub, room, rate, name);
 });
 
 roomInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') joinBtn.click();
+});
+
+nameInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') joinBtn.click();
 });
 

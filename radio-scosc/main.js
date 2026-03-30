@@ -33,7 +33,7 @@ const SCLANG_PORT  = 57120;  // sclang OSC port
 const OSC_IN_PORT  = 57121;  // listens for OSC from SC (SC → hub)
 const RECONNECT_MS = 3000;
 
-const MY_NAME = 'User-' + Math.floor(Math.random() * 1000);
+let myName        = null;
 let HUB_URL       = '';
 let roomName      = null;
 let sampleRate    = 48000;
@@ -45,6 +45,16 @@ let sclangProcess;
 let wsClient;
 const udpClient = dgram.createSocket('udp4');
 const udpServer = dgram.createSocket('udp4');
+
+// =========================================
+// Name helpers
+// =========================================
+function generateListenerName() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let suffix = '';
+    for (let i = 0; i < 4; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+    return `listener-${suffix}`;
+}
 
 // =========================================
 // sclang path detection
@@ -153,7 +163,7 @@ function createWindow() {
 // =========================================
 // IPC
 // =========================================
-ipcMain.on('join-room', async (event, { hub, room, rate }) => {
+ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
     HUB_URL    = hub.startsWith('ws') ? hub : 'wss://' + hub;
     roomName   = room;
     sampleRate = rate;
@@ -161,18 +171,20 @@ ipcMain.on('join-room', async (event, { hub, room, rate }) => {
     const scsynthRunning = await checkScsynth();
 
     if (scsynthRunning) {
-        // Performer mode: scsynth already running
+        // Performer mode: use the name entered by the user
         launchedScsynth = false;
         scReceivePort   = SCLANG_PORT;  // forward hub OSC to sclang (57120)
-        sendToUI('log', 'scsynth already running — performer mode.');
+        myName = name || ('performer-' + Math.random().toString(36).slice(2, 6));
+        sendToUI('log', `scsynth already running — performer mode (name: ${myName}).`);
         sendToUI('log', 'Please run OSCdef(\\remoteProxy, ...) in your SC editor.');
         connectToHub();
         startUdpServer();
     } else {
-        // Listener mode: launch sclang + scsynth
+        // Listener mode: auto-generate a listener name, ignore any entered name
         launchedScsynth = true;
         scReceivePort   = SCSYNTH_PORT;  // forward hub OSC directly to scsynth (57110)
-        sendToUI('log', 'scsynth not found — launching sclang (listener mode).');
+        myName = generateListenerName();
+        sendToUI('log', `scsynth not found — launching sclang (listener mode, name: ${myName}).`);
         startSclang(rate, () => {
             connectToHub();
             startUdpServer();
@@ -275,7 +287,7 @@ function connectToHub() {
         console.log('Connected to hub');
         wsClient.send(JSON.stringify({
             type: 'join',
-            name: MY_NAME,
+            name: myName,
             room: roomName
         }));
     });
