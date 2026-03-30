@@ -138,18 +138,24 @@ python local.py your-hub-domain.example.com
 | `--sc-port` | 57120 | SC の受信ポート |
 | `--osc-port` | 57121 | ローカル OSC 受信ポート |
 | `--rate` | 48000 | セッションのサンプルレート（確認表示用） |
+| `--name` | （プロンプト） | セッション内での名前 |
+| `--room` | （プロンプト） | 参加するルーム名 |
 
-起動時に名前とルーム名の入力を求められます。
+`--name` または `--room` を省略した場合は、起動時に入力を求められます。ルーム内で名前が重複している場合はハブから接続を拒否されます。
 
 #### 演奏者向け SuperCollider セットアップ
 
 セッション開始前に、以下の OSCdef を SC で実行しておく必要があります。他の演奏者からの OSC（local.py 経由でポート 57120 に届く）を受信し、scsynth へ転送します。
 
 ```supercollider
-// リモート演奏者からの OSC を受信し、scsynth へ転送する
+// リモート演奏者からの OSC を受信し、/remote/<名前>/ プレフィックスを除去して scsynth へ転送する
 OSCdef(\remoteProxy, { |msg, time, addr|
-    s.addr.sendMsg(*msg);
-}, '/remote');
+    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+    if(parts.size >= 3 && { parts[0] == "remote" }, {
+        var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+        s.addr.sendMsg(cmd, *msg[1..]);
+    });
+}, nil);
 ```
 
 典型的なセッションセットアップ:
@@ -159,8 +165,12 @@ s.waitForBoot({
 
     // 1. リモートプロキシを設定する
     OSCdef(\remoteProxy, { |msg, time, addr|
-        s.addr.sendMsg(*msg);
-    }, '/remote');
+        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+        if(parts.size >= 3 && { parts[0] == "remote" }, {
+            var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    }, nil);
 
     // 2. SynthDef を全参加者へ送信する
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -187,7 +197,7 @@ Join を押したとき、Radio SCOSC は scsynth が既に起動しているか
 
 | 状況 | モード | 動作 |
 |------|--------|------|
-| scsynth が**起動していない** | **リスナー** | sclang を起動して scsynth をブートし、ハブからの OSC を直接 scsynth（ポート 57110）へ転送します。sclang は scsynth の起動のみに使用され、OSC ルーティングには関与しません。 |
+| scsynth が**起動していない** | **リスナー** | sclang を起動して scsynth をブートし、ハブからの OSC を sclang（ポート 57120）へ転送します。sclang の `OSCdef(\remoteProxy)` が送信者プレフィックスを除去して scsynth へリレーします。 |
 | scsynth が**既に起動している** | **演奏者** | sclang を起動しません。ハブからの OSC を既存の sclang（ポート 57120）へ転送します。エディタで OSCdef を手動で実行し、OSC を scsynth へリレーする必要があります。 |
 
 どちらのモードでも、Radio SCOSC はポート 57121 で SC からの OSC を受信してハブへ転送します。
@@ -201,8 +211,12 @@ Join を押したとき、Radio SCOSC は scsynth が既に起動しているか
 
 ```supercollider
 OSCdef(\remoteProxy, { |msg, time, addr|
-    s.addr.sendMsg(*msg);
-}, '/remote');
+    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
+    if(parts.size >= 3 && { parts[0] == "remote" }, {
+        var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
+        s.addr.sendMsg(cmd, *msg[1..]);
+    });
+}, nil);
 ```
 
 > **Overtone / Supriya ユーザーへ:** 上記の OSCdef は sclang 向けです。Overtone や Supriya では OSC 受信の実装が異なります。各プロジェクトのドキュメントを参照してください。
@@ -253,7 +267,28 @@ npm run build:linux  # Linux AppImage
 2. *（演奏者のみ）* エディタで SC サーバーをブートし、`OSCdef(\remoteProxy, ...)` を実行してから Radio SCOSC を起動する。
 3. Radio SCOSC を起動する。
 4. ハブサーバーのアドレス（例：`wss://live.example.com` または `live.example.com`）、ルーム名、サンプルレートを入力する。
-5. **Join** をクリックする。
+5. **名前フィールド:**
+   - **演奏者モード**（scsynth 起動済み）: 名前を入力する。ルーム内で一意である必要がある。
+   - **リスナーモード**（scsynth 未起動）: 名前フィールドは無視され、`listener-XXXX` 形式のランダムな名前が自動で割り当てられる。
+6. **Join** をクリックする。
+
+#### /who コマンド
+
+ハブへ OSC `/who` メッセージを送信することで、現在のルームの参加者一覧を取得できます:
+
+```supercollider
+~hub = NetAddr("127.0.0.1", 57121);
+~hub.sendMsg('/who');
+```
+
+ハブは `/who/reply` OSC メッセージで返信し、現在の参加者名が文字列引数として含まれます:
+
+```supercollider
+OSCdef(\whoReply, { |msg|
+    var names = msg[1..];
+    ("参加者: " ++ names.join(", ")).postln;
+}, '/who/reply');
+```
 
 ---
 
