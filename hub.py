@@ -135,6 +135,13 @@ async def handler(ws):
 
         if room not in rooms:
             rooms[room] = {}
+
+        if name in rooms[room].values():
+            print(f"[!] '{name}' rejected from '{room}': name already in use")
+            await send_text(ws, {"type": "error", "message": f"Name '{name}' is already in use in room '{room}'"})
+            await ws.close()
+            return
+
         rooms[room][ws] = name
 
         member_names = list(rooms[room].values())
