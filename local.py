@@ -34,6 +34,7 @@ print(f"Sample rate: {args.rate} Hz  — please boot SC server at the same rate.
 
 ws_connection = None
 loop          = None
+sc_send_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 
 # --- Receive raw UDP from SC and forward as binary WebSocket frame ---
@@ -70,9 +71,7 @@ async def ws_client():
                 async for message in ws:
                     if isinstance(message, bytes):
                         # Forward binary OSC to SC via UDP
-                        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                        sock.sendto(message, ("127.0.0.1", SC_RECEIVE_PORT))
-                        sock.close()
+                        sc_send_sock.sendto(message, ("127.0.0.1", SC_RECEIVE_PORT))
                     else:
                         # Text frames are info messages from hub
                         data = json.loads(message)

@@ -10,6 +10,7 @@ import asyncio
 import websockets
 import json
 import argparse
+import struct
 
 # --- Arguments ---
 parser = argparse.ArgumentParser(description="OSC WebSocket hub for Radio SCOSC")
@@ -27,18 +28,43 @@ def _pad4(n: int) -> int:
     return (n + 3) & ~3
 
 
+def rewrite_bundle(data: bytes, sender_name: str) -> bytes:
+    """Recursively rewrite OSC addresses within an OSC bundle.
+
+    Preserves the bundle header (including timetag) and rewrites each
+    contained OSC message address. Nested bundles are handled recursively.
+    Returns the original data unchanged on any parse error.
+    """
+    if len(data) < 16:
+        return data
+    # '#bundle\0' (8 bytes) + timetag (8 bytes)
+    header = data[:16]
+    pos = 16
+    result = header
+    while pos + 4 <= len(data):
+        size = struct.unpack('>I', data[pos:pos + 4])[0]
+        pos += 4
+        if pos + size > len(data):
+            break
+        elem = data[pos:pos + size]
+        pos += size
+        rewritten = rewrite_osc_address(elem, sender_name)
+        result += struct.pack('>I', len(rewritten)) + rewritten
+    return result
+
+
 def rewrite_osc_address(data: bytes, sender_name: str) -> bytes:
     """Rewrite an OSC message address from /addr to /remote/<sender_name>/addr.
 
-    OSC bundles (starting with '#bundle') are passed through unchanged to
-    preserve their timetags for synchronized playback.
+    OSC bundles are handled by rewrite_bundle (timetag preserved, each
+    contained message address is rewritten recursively).
     Returns the original data unchanged on any parse error.
     """
     if len(data) < 4:
         return data
-    # OSC bundles: pass through unchanged (timetag must be preserved)
+    # OSC bundles: rewrite each contained message, preserving timetag
     if data[:7] == b'#bundle':
-        return data
+        return rewrite_bundle(data, sender_name)
     # OSC messages must start with '/'
     if data[0:1] != b'/':
         return data
