@@ -192,6 +192,10 @@ async def handler(ws):
             logger.warning(f"Invalid JSON from {client_ip}")
             await ws.close()
             return
+        if not isinstance(data, dict):
+            logger.warning(f"Invalid JSON structure from {client_ip}")
+            await ws.close()
+            return
         if data.get("type") != "join":
             logger.warning(f"Invalid first message from {client_ip}: {data}")
             await ws.close()
