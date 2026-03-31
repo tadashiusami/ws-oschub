@@ -41,6 +41,15 @@ nameInput.addEventListener('keydown', (e) => {
 window.api.onStatus((state) => {
     dot.className          = state;
     statusText.textContent = STATUS_LABELS[state] ?? state;
+
+    // Re-enable UI on unrecoverable error so the user can correct and retry
+    if (state === 'error') {
+        joinBtn.disabled    = false;
+        hubInput.disabled   = false;
+        roomInput.disabled  = false;
+        nameInput.disabled  = false;
+        rateSelect.disabled = false;
+    }
 });
 
 window.api.onLog((msg) => {

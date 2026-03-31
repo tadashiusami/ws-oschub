@@ -47,6 +47,8 @@ let sclangProcess;
 let wsClient;
 const udpClient = dgram.createSocket('udp4');
 const udpServer = dgram.createSocket('udp4');
+let udpServerBound = false;
+let isJoining     = false;  // guard against concurrent join-room IPC
 
 // =========================================
 // Name helpers
@@ -166,6 +168,15 @@ function createWindow() {
 // IPC
 // =========================================
 ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
+    if (isJoining) return;
+    isJoining = true;
+
+    // Kill any previous sclang process before starting a new join
+    if (sclangProcess) {
+        sclangProcess.kill();
+        sclangProcess = null;
+    }
+
     HUB_URL    = hub.startsWith('ws') ? hub : 'wss://' + hub;
     roomName   = room;
     sampleRate = rate;
@@ -192,6 +203,8 @@ ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
             startUdpServer();
         });
     }
+
+    isJoining = false;
 });
 
 // =========================================
@@ -266,6 +279,8 @@ function startSclang(rate, onReady) {
 // UDP server (SC → Radio SCOSC → hub)
 // =========================================
 function startUdpServer() {
+    if (udpServerBound) return;
+    udpServerBound = true;
     udpServer.bind(OSC_IN_PORT, '127.0.0.1', () => {
         console.log(`UDP server listening on port ${OSC_IN_PORT} (SC → hub)`);
     });
@@ -286,6 +301,12 @@ function startUdpServer() {
 // WebSocket connection
 // =========================================
 function connectToHub() {
+    // Close any existing connection and remove its handlers before creating a new one
+    if (wsClient) {
+        wsClient.removeAllListeners('close');
+        wsClient.terminate();
+        wsClient = null;
+    }
     let suppressReconnect = false;
     sendToUI('status', 'connecting');
     wsClient = new WebSocket(HUB_URL);

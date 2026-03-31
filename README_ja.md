@@ -73,6 +73,16 @@ pip install -r requirements.txt
 python hub.py --port 8765
 ```
 
+追加オプション（すべて省略可能）:
+
+| オプション | デフォルト | 説明 |
+|-----------|-----------|------|
+| `--port` | 8765 | ハブの待ち受けポート |
+| `--no-rewrite` | — | OSC アドレス書き換えを無効化（フレームをそのまま転送） |
+| `--max-msg-size` | 65536 | メッセージ1件あたりの最大サイズ（バイト） |
+| `--rate-limit` | 200 | クライアントあたりの最大メッセージ数／秒 |
+| `--log-level` | INFO | ログレベル: `DEBUG`、`INFO`、`WARNING`、`ERROR` |
+
 #### Nginx 設定例（wss://）
 
 ```nginx

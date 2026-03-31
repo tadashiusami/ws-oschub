@@ -35,9 +35,12 @@ MY_NAME = args.name if args.name else input("Your name: ").strip()
 MY_ROOM = args.room if args.room else input("Room name: ").strip()
 print(f"Sample rate: {args.rate} Hz  — please boot SC server at the same rate.")
 
-ws_connection = None
-loop          = None
-sc_send_sock  = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+ws_connection    = None
+loop             = None
+sc_send_sock     = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+RECONNECT_DELAY_INIT = 1
+RECONNECT_DELAY_MAX  = 30
 
 
 # --- Receive raw UDP from SC and forward as binary WebSocket frame ---
@@ -57,7 +60,7 @@ def udp_receiver():
 # --- WebSocket main loop ---
 async def ws_client():
     global ws_connection, loop
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     join_msg = json.dumps({
         "type": "join",
@@ -65,10 +68,13 @@ async def ws_client():
         "room": MY_ROOM
     })
 
+    reconnect_delay = RECONNECT_DELAY_INIT
+
     while True:
         try:
             async with websockets.connect(SERVER_WS_URL) as ws:
                 ws_connection = ws
+                reconnect_delay = RECONNECT_DELAY_INIT  # reset on successful connection
                 await ws.send(join_msg)
 
                 async for message in ws:
@@ -88,9 +94,10 @@ async def ws_client():
             print("Shutting down...")
             break
         except Exception as e:
-            print(f"Disconnected: {e}. Reconnecting in 3s...")
+            print(f"Disconnected: {e}. Reconnecting in {reconnect_delay}s...")
             ws_connection = None
-            await asyncio.sleep(3)
+            await asyncio.sleep(reconnect_delay)
+            reconnect_delay = min(reconnect_delay * 2, RECONNECT_DELAY_MAX)
 
 
 if __name__ == "__main__":

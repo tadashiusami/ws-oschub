@@ -73,6 +73,16 @@ Run:
 python hub.py --port 8765
 ```
 
+Additional options (all optional):
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--port` | 8765 | Hub listen port |
+| `--no-rewrite` | — | Disable OSC address rewriting (pass frames verbatim) |
+| `--max-msg-size` | 65536 | Max OSC message size in bytes per message |
+| `--rate-limit` | 200 | Max messages per second per client |
+| `--log-level` | INFO | Log level: `DEBUG`, `INFO`, `WARNING`, `ERROR` |
+
 #### Nginx configuration example (wss://)
 
 ```nginx
