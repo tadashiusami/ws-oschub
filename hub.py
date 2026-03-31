@@ -68,14 +68,14 @@ def build_osc_message(address: str, *args: str) -> bytes:
     return msg
 
 
-def rewrite_bundle(data: bytes, sender_name: str) -> bytes:
+def rewrite_bundle(data: bytes, sender_name: str, _depth: int = 0) -> bytes:
     """Recursively rewrite OSC addresses within an OSC bundle.
 
     Preserves the bundle header (including timetag) and rewrites each
     contained OSC message address. Nested bundles are handled recursively.
     Returns the original data unchanged on any parse error.
     """
-    if len(data) < 16:
+    if _depth > 8 or len(data) < 16:
         return data
     # '#bundle\0' (8 bytes) + timetag (8 bytes)
     header = data[:16]
@@ -88,12 +88,12 @@ def rewrite_bundle(data: bytes, sender_name: str) -> bytes:
             break
         elem = data[pos:pos + size]
         pos += size
-        rewritten = rewrite_osc_address(elem, sender_name)
+        rewritten = rewrite_osc_address(elem, sender_name, _depth + 1)
         result += struct.pack('>I', len(rewritten)) + rewritten
     return result
 
 
-def rewrite_osc_address(data: bytes, sender_name: str) -> bytes:
+def rewrite_osc_address(data: bytes, sender_name: str, _depth: int = 0) -> bytes:
     """Rewrite an OSC message address from /addr to /remote/<sender_name>/addr.
 
     OSC bundles are handled by rewrite_bundle (timetag preserved, each
@@ -104,7 +104,7 @@ def rewrite_osc_address(data: bytes, sender_name: str) -> bytes:
         return data
     # OSC bundles: rewrite each contained message, preserving timetag
     if data[:7] == b'#bundle':
-        return rewrite_bundle(data, sender_name)
+        return rewrite_bundle(data, sender_name, _depth)
     # OSC messages must start with '/'
     if data[0:1] != b'/':
         return data
@@ -124,8 +124,10 @@ def rewrite_osc_address(data: bytes, sender_name: str) -> bytes:
         return data
 
 
-def bundle_contains_who(data: bytes) -> bool:
+def bundle_contains_who(data: bytes, _depth: int = 0) -> bool:
     """Return True if data is an OSC bundle that contains a /who message."""
+    if _depth > 8:
+        return False
     if data[:7] != b'#bundle' or len(data) < 16:
         return False
     pos = 16
@@ -137,7 +139,7 @@ def bundle_contains_who(data: bytes) -> bool:
         elem = data[pos:pos + size]
         pos += size
         if elem[:7] == b'#bundle':
-            if bundle_contains_who(elem):
+            if bundle_contains_who(elem, _depth + 1):
                 return True
         elif parse_osc_address(elem) == '/who':
             return True
@@ -184,7 +186,12 @@ async def handler(ws):
             await ws.close()
             return
 
-        data = json.loads(raw)
+        try:
+            data = json.loads(raw)
+        except (json.JSONDecodeError, ValueError):
+            logger.warning(f"Invalid JSON from {client_ip}")
+            await ws.close()
+            return
         if data.get("type") != "join":
             logger.warning(f"Invalid first message from {client_ip}: {data}")
             await ws.close()
