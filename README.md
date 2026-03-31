@@ -151,7 +151,7 @@ Options:
 | `--name` | *(prompted)* | Your name in the session |
 | `--room` | *(prompted)* | Room name to join |
 
-If `--name` or `--room` are omitted, you will be prompted for them on startup. Each participant's name must be unique within a room — if the name is already in use the hub will reject the connection.
+If `--name` or `--room` are omitted, you will be prompted for them on startup. Each participant's name must be unique within a room and must not contain `/` — if the name is already in use or invalid the hub will reject the connection.
 
 #### SuperCollider setup for performers
 
@@ -278,7 +278,7 @@ npm run build:linux  # Linux AppImage
 3. Launch Radio SCOSC.
 4. Enter the hub server address (e.g. `wss://live.example.com` or just `live.example.com`), room name, and sample rate.
 5. **Name field:**
-   - **Performer mode** (scsynth already running): enter your name. Must be unique in the room.
+   - **Performer mode** (scsynth already running): enter your name. Must be unique in the room and must not contain `/`.
    - **Listener mode** (scsynth not running): the name field is ignored — a random `listener-XXXX` name is assigned automatically.
 6. Click **Join**.
 
