@@ -46,7 +46,11 @@ RECONNECT_DELAY_MAX  = 30
 # --- Receive raw UDP from SC and forward as binary WebSocket frame ---
 def udp_receiver():
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("127.0.0.1", LOCAL_OSC_PORT))
+    try:
+        sock.bind(("127.0.0.1", LOCAL_OSC_PORT))
+    except OSError as e:
+        print(f"[error] Cannot bind UDP port {LOCAL_OSC_PORT}: {e}", flush=True)
+        return
     print(f"OSC listening on port {LOCAL_OSC_PORT}")
     while True:
         data, _ = sock.recvfrom(65536)

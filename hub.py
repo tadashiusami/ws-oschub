@@ -204,6 +204,12 @@ async def handler(ws):
         name = data.get("name", "unknown")
         room = data.get("room", "default")
 
+        if '/' in name:
+            logger.warning(f"[!] Invalid name from {client_ip}: '/' not allowed")
+            await send_text(ws, {"type": "error", "message": "Name must not contain '/'"})
+            await ws.close()
+            return
+
         if room not in rooms:
             rooms[room] = {}
 
@@ -278,4 +284,5 @@ async def main():
         await asyncio.Future()
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    asyncio.run(main())
