@@ -161,7 +161,7 @@ Opsi:
 | `--name` | *(ditanya)* | Nama Anda dalam sesi |
 | `--room` | *(ditanya)* | Nama ruang yang akan dimasuki |
 
-Jika `--name` atau `--room` dihilangkan, Anda akan diminta untuk mengisinya saat startup. Nama setiap peserta harus unik dalam ruang, tidak boleh kosong, tidak boleh melebihi 64 karakter, dan tidak boleh mengandung `/` — jika nama sudah digunakan atau tidak valid, hub akan menolak koneksi. Nama ruang juga tidak boleh kosong.
+Jika `--name` atau `--room` dihilangkan, Anda akan diminta untuk mengisinya saat startup. Nama setiap peserta harus unik dalam ruang, tidak boleh kosong, tidak boleh melebihi 64 karakter, dan tidak boleh mengandung `/` — jika nama sudah digunakan atau tidak valid, hub akan menolak koneksi. Nama ruang juga tidak boleh kosong dan tidak boleh melebihi 64 karakter.
 
 #### Pengaturan SuperCollider untuk performer
 

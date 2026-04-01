@@ -161,7 +161,7 @@ Mga opsyon:
 | `--name` | *(tinanong)* | Iyong pangalan sa session |
 | `--room` | *(tinanong)* | Pangalan ng silid na sasalihan |
 
-Kung aalisin ang `--name` o `--room`, tatanungin ka ng programa sa startup. Ang pangalan ng bawat kalahok ay dapat natatangi sa loob ng silid, hindi dapat walang laman, hindi dapat lumampas sa 64 na karakter, at hindi dapat naglalaman ng `/` — kung ang pangalan ay ginagamit na o hindi wasto, ang hub ay tatanggihan ang koneksyon. Ang pangalan ng silid ay hindi rin dapat walang laman.
+Kung aalisin ang `--name` o `--room`, tatanungin ka ng programa sa startup. Ang pangalan ng bawat kalahok ay dapat natatangi sa loob ng silid, hindi dapat walang laman, hindi dapat lumampas sa 64 na karakter, at hindi dapat naglalaman ng `/` — kung ang pangalan ay ginagamit na o hindi wasto, ang hub ay tatanggihan ang koneksyon. Ang pangalan ng silid ay hindi rin dapat walang laman at hindi dapat lumampas sa 64 na karakter.
 
 #### SuperCollider setup para sa mga performer
 

@@ -161,7 +161,7 @@ Các tùy chọn:
 | `--name` | *(được hỏi)* | Tên của bạn trong phiên |
 | `--room` | *(được hỏi)* | Tên phòng muốn tham gia |
 
-Nếu bỏ qua `--name` hoặc `--room`, bạn sẽ được nhắc nhập khi khởi động. Tên của mỗi người tham gia phải là duy nhất trong phòng, không được để trống, không được vượt quá 64 ký tự, và không được chứa `/` — nếu tên đã được sử dụng hoặc không hợp lệ, hub sẽ từ chối kết nối. Tên phòng cũng không được để trống.
+Nếu bỏ qua `--name` hoặc `--room`, bạn sẽ được nhắc nhập khi khởi động. Tên của mỗi người tham gia phải là duy nhất trong phòng, không được để trống, không được vượt quá 64 ký tự, và không được chứa `/` — nếu tên đã được sử dụng hoặc không hợp lệ, hub sẽ từ chối kết nối. Tên phòng cũng không được để trống và không được vượt quá 64 ký tự.
 
 #### Cài đặt SuperCollider cho performer
 

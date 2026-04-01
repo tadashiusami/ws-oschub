@@ -161,7 +161,7 @@ Options:
 | `--name` | *(prompted)* | Your name in the session |
 | `--room` | *(prompted)* | Room name to join |
 
-If `--name` or `--room` are omitted, you will be prompted for them on startup. Each participant's name must be unique within a room, must not be empty, must not exceed 64 characters, and must not contain `/` — if the name is already in use or invalid the hub will reject the connection. The room name must also not be empty.
+If `--name` or `--room` are omitted, you will be prompted for them on startup. Each participant's name must be unique within a room, must not be empty, must not exceed 64 characters, and must not contain `/` — if the name is already in use or invalid the hub will reject the connection. The room name must also not be empty and must not exceed 64 characters.
 
 #### SuperCollider setup for performers
 

@@ -224,6 +224,12 @@ async def handler(ws):
             await ws.close()
             return
 
+        if len(room) > MAX_NAME_LENGTH:
+            logger.warning(f"[!] Invalid room from {client_ip}: too long ({len(room)} chars)")
+            await send_text(ws, {"type": "error", "message": f"Room name must not exceed {MAX_NAME_LENGTH} characters"})
+            await ws.close()
+            return
+
         if room not in rooms:
             rooms[room] = {}
 
