@@ -161,7 +161,7 @@ python local.py your-hub-domain.example.com
 | `--name` | （提示输入） | 会话中使用的名称 |
 | `--room` | （提示输入） | 要加入的房间名 |
 
-省略 `--name` 或 `--room` 时，启动时会提示输入。如果房间内存在重名、名称为空或名称中包含 `/`，Hub 将拒绝连接。
+省略 `--name` 或 `--room` 时，启动时会提示输入。如果房间内存在重名、名称为空、名称超过 64 个字符或包含 `/`，或房间名为空，Hub 将拒绝连接。
 
 #### 演奏者用 SuperCollider 设置
 
@@ -288,7 +288,7 @@ npm run build:linux  # Linux AppImage
 3. 启动 Radio SCOSC。
 4. 输入 Hub 服务器地址（例如：`wss://live.example.com` 或 `live.example.com`）、房间名和采样率。
 5. **名称字段：**
-   - **演奏者模式**（scsynth 已运行）：输入名称。名称在房间内必须唯一，不能为空，且不能包含 `/`。
+   - **演奏者模式**（scsynth 已运行）：输入名称。名称在房间内必须唯一，不能为空，不能超过 64 个字符，且不能包含 `/`。
    - **听众模式**（scsynth 未运行）：名称字段将被忽略，系统自动分配 `listener-XXXX` 格式的随机名称。
 6. 点击 **Join**。
 

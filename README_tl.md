@@ -161,7 +161,7 @@ Mga opsyon:
 | `--name` | *(tinanong)* | Iyong pangalan sa session |
 | `--room` | *(tinanong)* | Pangalan ng silid na sasalihan |
 
-Kung aalisin ang `--name` o `--room`, tatanungin ka ng programa sa startup. Ang pangalan ng bawat kalahok ay dapat natatangi sa loob ng silid, hindi dapat walang laman, at hindi dapat naglalaman ng `/` — kung ang pangalan ay ginagamit na o hindi wasto, ang hub ay tatanggihan ang koneksyon.
+Kung aalisin ang `--name` o `--room`, tatanungin ka ng programa sa startup. Ang pangalan ng bawat kalahok ay dapat natatangi sa loob ng silid, hindi dapat walang laman, hindi dapat lumampas sa 64 na karakter, at hindi dapat naglalaman ng `/` — kung ang pangalan ay ginagamit na o hindi wasto, ang hub ay tatanggihan ang koneksyon. Ang pangalan ng silid ay hindi rin dapat walang laman.
 
 #### SuperCollider setup para sa mga performer
 
@@ -288,7 +288,7 @@ npm run build:linux  # Linux AppImage
 3. Ilunsad ang Radio SCOSC.
 4. Ilagay ang hub server address (hal. `wss://live.example.com` o `live.example.com`), pangalan ng silid, at sample rate.
 5. **Field ng pangalan:**
-   - **Performer mode** (tumatakbo na ang scsynth): ilagay ang iyong pangalan. Dapat natatangi sa silid, hindi dapat walang laman, at hindi naglalaman ng `/`.
+   - **Performer mode** (tumatakbo na ang scsynth): ilagay ang iyong pangalan. Dapat natatangi sa silid, hindi dapat walang laman, hindi dapat lumampas sa 64 na karakter, at hindi naglalaman ng `/`.
    - **Listener mode** (hindi tumatakbo ang scsynth): ang field ng pangalan ay binabalewala — isang random na pangalang `listener-XXXX` ang awtomatikong itinalaga.
 6. I-click ang **Join**.
 

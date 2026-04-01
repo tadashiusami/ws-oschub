@@ -177,7 +177,7 @@ ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
         sclangProcess = null;
     }
 
-    HUB_URL    = hub.startsWith('ws') ? hub : 'wss://' + hub;
+    HUB_URL    = (hub.startsWith('ws://') || hub.startsWith('wss://')) ? hub : 'wss://' + hub;
     roomName   = room;
     sampleRate = rate;
 
@@ -215,6 +215,7 @@ function startSclang(rate, onReady) {
     if (!sclangPath) {
         sendToUI('log', '⚠ sclang not found. Please install SuperCollider.');
         sendToUI('status', 'error');
+        isJoining = false;
         return;
     }
 

@@ -59,9 +59,10 @@ def udp_receiver():
             print(f"[error] UDP receive error: {e}", flush=True)
             break
         if ws_connection is not None and loop is not None:
-            asyncio.run_coroutine_threadsafe(
-                ws_connection.send(data),
-                loop
+            fut = asyncio.run_coroutine_threadsafe(ws_connection.send(data), loop)
+            fut.add_done_callback(
+                lambda f: print(f"[error] WS send failed: {f.exception()}", flush=True)
+                if f.exception() else None
             )
 
 

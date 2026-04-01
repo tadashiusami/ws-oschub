@@ -35,6 +35,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger("oschub")
 
+MAX_NAME_LENGTH = 64  # max name length in characters
+
 
 # --- OSC helpers ---
 
@@ -201,12 +203,24 @@ async def handler(ws):
             await ws.close()
             return
 
-        name = data.get("name", "unknown")
-        room = data.get("room", "default")
+        name = data.get("name", "unknown").strip()
+        room = data.get("room", "default").strip()
 
-        if not name.strip() or '/' in name:
+        if not name or '/' in name:
             logger.warning(f"[!] Invalid name from {client_ip}: name is empty or contains '/'")
             await send_text(ws, {"type": "error", "message": "Name must not be empty or contain '/'"})
+            await ws.close()
+            return
+
+        if len(name) > MAX_NAME_LENGTH:
+            logger.warning(f"[!] Invalid name from {client_ip}: too long ({len(name)} chars)")
+            await send_text(ws, {"type": "error", "message": f"Name must not exceed {MAX_NAME_LENGTH} characters"})
+            await ws.close()
+            return
+
+        if not room:
+            logger.warning(f"[!] Invalid room from {client_ip}: room name is empty")
+            await send_text(ws, {"type": "error", "message": "Room name must not be empty"})
             await ws.close()
             return
 
