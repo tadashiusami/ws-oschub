@@ -291,7 +291,7 @@ npm run build:linux  # Linux AppImage
 ~hub.sendMsg('/who');
 ```
 
-ハブは `/who/reply` OSC メッセージで返信し、現在の参加者名が文字列引数として含まれます:
+ハブは `/who/reply` OSC メッセージで返信し、現在の参加者名が文字列引数として含まれます。同じ `/who/reply` は参加時にも自動的に送信されるため、以下の `OSCdef` を設定しておけば `/who` を明示的に送らなくても接続時に参加者一覧を受け取ることができます:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

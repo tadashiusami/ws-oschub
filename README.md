@@ -291,7 +291,7 @@ Any participant can query the current room membership by sending an OSC `/who` m
 ~hub.sendMsg('/who');
 ```
 
-The hub replies with a `/who/reply` OSC message containing the names of all current participants as string arguments:
+The hub replies with a `/who/reply` OSC message containing the names of all current participants as string arguments. The same `/who/reply` is also sent automatically at join time, so the `OSCdef` below will fire on connection without needing an explicit `/who`:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

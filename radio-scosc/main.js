@@ -192,6 +192,7 @@ ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
         sendToUI('log', 'Please run OSCdef(\\remoteProxy, ...) in your SC editor.');
         connectToHub();
         startUdpServer();
+        isJoining = false;
     } else {
         // Listener mode: auto-generate a listener name, ignore any entered name
         launchedScsynth = true;
@@ -201,10 +202,9 @@ ipcMain.on('join-room', async (event, { hub, room, rate, name }) => {
         startSclang(rate, () => {
             connectToHub();
             startUdpServer();
+            isJoining = false;
         });
     }
-
-    isJoining = false;
 });
 
 // =========================================

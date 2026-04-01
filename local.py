@@ -53,8 +53,12 @@ def udp_receiver():
         return
     print(f"OSC listening on port {LOCAL_OSC_PORT}")
     while True:
-        data, _ = sock.recvfrom(65536)
-        if ws_connection is not None:
+        try:
+            data, _ = sock.recvfrom(65536)
+        except OSError as e:
+            print(f"[error] UDP receive error: {e}", flush=True)
+            break
+        if ws_connection is not None and loop is not None:
             asyncio.run_coroutine_threadsafe(
                 ws_connection.send(data),
                 loop

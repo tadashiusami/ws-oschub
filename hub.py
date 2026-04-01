@@ -228,6 +228,7 @@ async def handler(ws):
             "type": "info",
             "message": f"Members in '{room}': {', '.join(member_names)}"
         })
+        await send_binary(ws, build_osc_message('/who/reply', *member_names))
         await broadcast_info(room, f"{name} joined", exclude=ws)
 
         rate_count = 0
