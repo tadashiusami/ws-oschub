@@ -161,7 +161,7 @@ Opsi:
 | `--name` | *(ditanya)* | Nama Anda dalam sesi |
 | `--room` | *(ditanya)* | Nama ruang yang akan dimasuki |
 
-Jika `--name` atau `--room` dihilangkan, Anda akan diminta untuk mengisinya saat startup. Nama setiap peserta harus unik dalam ruang dan tidak boleh mengandung `/` — jika nama sudah digunakan atau tidak valid, hub akan menolak koneksi.
+Jika `--name` atau `--room` dihilangkan, Anda akan diminta untuk mengisinya saat startup. Nama setiap peserta harus unik dalam ruang, tidak boleh kosong, dan tidak boleh mengandung `/` — jika nama sudah digunakan atau tidak valid, hub akan menolak koneksi.
 
 #### Pengaturan SuperCollider untuk performer
 
@@ -288,7 +288,7 @@ npm run build:linux  # Linux AppImage
 3. Luncurkan Radio SCOSC.
 4. Masukkan alamat hub server (mis. `wss://live.example.com` atau `live.example.com`), nama ruang, dan sample rate.
 5. **Kolom nama:**
-   - **Mode Performer** (scsynth sudah berjalan): masukkan nama Anda. Harus unik di ruang dan tidak boleh mengandung `/`.
+   - **Mode Performer** (scsynth sudah berjalan): masukkan nama Anda. Harus unik di ruang, tidak boleh kosong, dan tidak boleh mengandung `/`.
    - **Mode Listener** (scsynth belum berjalan): kolom nama diabaikan — nama acak berformat `listener-XXXX` ditetapkan secara otomatis.
 6. Klik **Join**.
 

@@ -161,7 +161,7 @@ Các tùy chọn:
 | `--name` | *(được hỏi)* | Tên của bạn trong phiên |
 | `--room` | *(được hỏi)* | Tên phòng muốn tham gia |
 
-Nếu bỏ qua `--name` hoặc `--room`, bạn sẽ được nhắc nhập khi khởi động. Tên của mỗi người tham gia phải là duy nhất trong phòng và không được chứa `/` — nếu tên đã được sử dụng hoặc không hợp lệ, hub sẽ từ chối kết nối.
+Nếu bỏ qua `--name` hoặc `--room`, bạn sẽ được nhắc nhập khi khởi động. Tên của mỗi người tham gia phải là duy nhất trong phòng, không được để trống, và không được chứa `/` — nếu tên đã được sử dụng hoặc không hợp lệ, hub sẽ từ chối kết nối.
 
 #### Cài đặt SuperCollider cho performer
 
@@ -288,7 +288,7 @@ npm run build:linux  # Linux AppImage
 3. Khởi chạy Radio SCOSC.
 4. Nhập địa chỉ hub server (ví dụ: `wss://live.example.com` hoặc `live.example.com`), tên phòng và sample rate.
 5. **Trường tên:**
-   - **Chế độ Performer** (scsynth đã chạy): nhập tên của bạn. Phải là duy nhất trong phòng và không được chứa `/`.
+   - **Chế độ Performer** (scsynth đã chạy): nhập tên của bạn. Phải là duy nhất trong phòng, không được để trống, và không được chứa `/`.
    - **Chế độ Listener** (scsynth chưa chạy): trường tên bị bỏ qua — tên ngẫu nhiên dạng `listener-XXXX` được tự động gán.
 6. Nhấp **Join**.
 

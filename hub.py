@@ -84,7 +84,7 @@ def rewrite_bundle(data: bytes, sender_name: str, _depth: int = 0) -> bytes:
     while pos + 4 <= len(data):
         size = struct.unpack('>I', data[pos:pos + 4])[0]
         pos += 4
-        if pos + size > len(data):
+        if size == 0 or pos + size > len(data):
             break
         elem = data[pos:pos + size]
         pos += size
@@ -134,7 +134,7 @@ def bundle_contains_who(data: bytes, _depth: int = 0) -> bool:
     while pos + 4 <= len(data):
         size = struct.unpack('>I', data[pos:pos + 4])[0]
         pos += 4
-        if pos + size > len(data):
+        if size == 0 or pos + size > len(data):
             break
         elem = data[pos:pos + size]
         pos += size
@@ -204,9 +204,9 @@ async def handler(ws):
         name = data.get("name", "unknown")
         room = data.get("room", "default")
 
-        if '/' in name:
-            logger.warning(f"[!] Invalid name from {client_ip}: '/' not allowed")
-            await send_text(ws, {"type": "error", "message": "Name must not contain '/'"})
+        if not name.strip() or '/' in name:
+            logger.warning(f"[!] Invalid name from {client_ip}: name is empty or contains '/'")
+            await send_text(ws, {"type": "error", "message": "Name must not be empty or contain '/'"})
             await ws.close()
             return
 
