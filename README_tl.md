@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## Demo
+
+Ang pampublikong demo Hub ay tumatakbo sa `live.oschub.asia`. Tandaan na ang server na ito ay maaaring hindi laging accessible.
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## Mga Kinakailangan
 
 ### Hub server
@@ -291,7 +301,7 @@ Ang sinumang kalahok ay maaaring mag-query ng kasalukuyang membership ng silid s
 ~hub.sendMsg('/who');
 ```
 
-Ang hub ay sumasagot gamit ang isang `/who/reply` na OSC mensahe na naglalaman ng mga pangalan ng lahat ng kasalukuyang kalahok bilang string argument:
+Ang hub ay sumasagot gamit ang isang `/who/reply` na OSC mensahe na naglalaman ng mga pangalan ng lahat ng kasalukuyang kalahok bilang string argument. Ang parehong `/who/reply` ay awtomatikong ipinapadala rin sa oras ng pagsali, kaya ang `OSCdef` sa ibaba ay magpapalabas sa koneksyon nang hindi kailangang magpadala ng malinaw na `/who`:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

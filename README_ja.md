@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## デモ
+
+公開デモ Hub が `live.oschub.asia` で稼働しています。このサーバーは常時利用できるとは限りません。
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## 要件
 
 ### ハブサーバー

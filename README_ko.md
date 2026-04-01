@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## 데모
+
+공개 데모 Hub가 `live.oschub.asia`에서 운영 중입니다. 이 서버는 항상 접속 가능하지 않을 수 있습니다.
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## 요건
 
 ### 허브 서버
@@ -291,7 +301,7 @@ npm run build:linux  # Linux AppImage
 ~hub.sendMsg('/who');
 ```
 
-허브는 `/who/reply` OSC 메시지로 응답하며, 현재 참가자 이름이 문자열 인수로 포함됩니다:
+허브는 `/who/reply` OSC 메시지로 응답하며, 현재 참가자 이름이 문자열 인수로 포함됩니다. 동일한 `/who/reply`는 참가 시에도 자동으로 전송되므로, 아래의 `OSCdef`를 설정해두면 `/who`를 명시적으로 보내지 않아도 연결 시 참가자 목록을 받을 수 있습니다:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

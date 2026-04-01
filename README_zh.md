@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## 演示
+
+公开演示 Hub 正在 `live.oschub.asia` 上运行。请注意，该服务器可能并非始终可用。
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## 要求
 
 ### Hub 服务器
@@ -291,7 +301,7 @@ npm run build:linux  # Linux AppImage
 ~hub.sendMsg('/who');
 ```
 
-Hub 将以 `/who/reply` OSC 消息回复，其中包含当前参与者名称作为字符串参数：
+Hub 将以 `/who/reply` OSC 消息回复，其中包含当前参与者名称作为字符串参数。同一个 `/who/reply` 也会在加入时自动发送，因此设置好下方的 `OSCdef` 后，无需显式发送 `/who` 即可在连接时收到参与者列表：
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

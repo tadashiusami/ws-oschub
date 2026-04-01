@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## Demo
+
+Một Hub demo công cộng đang chạy tại `live.oschub.asia`. Lưu ý rằng server này có thể không phải lúc nào cũng có thể truy cập được.
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## Yêu cầu
 
 ### Hub server
@@ -291,7 +301,7 @@ Bất kỳ người tham gia nào cũng có thể truy vấn danh sách thành v
 ~hub.sendMsg('/who');
 ```
 
-Hub trả lời bằng tin nhắn OSC `/who/reply` chứa tên của tất cả người tham gia hiện tại dưới dạng string argument:
+Hub trả lời bằng tin nhắn OSC `/who/reply` chứa tên của tất cả người tham gia hiện tại dưới dạng string argument. `/who/reply` tương tự cũng được gửi tự động lúc tham gia, vì vậy `OSCdef` dưới đây sẽ kích hoạt khi kết nối mà không cần gửi `/who` tường minh:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

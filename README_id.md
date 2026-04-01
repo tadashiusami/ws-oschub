@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## Demo
+
+Hub demo publik berjalan di `live.oschub.asia`. Perlu diperhatikan bahwa server ini mungkin tidak selalu dapat diakses.
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## Persyaratan
 
 ### Hub server
@@ -291,7 +301,7 @@ Peserta mana pun dapat menanyakan keanggotaan ruang saat ini dengan mengirim pes
 ~hub.sendMsg('/who');
 ```
 
-Hub membalas dengan pesan OSC `/who/reply` yang berisi nama semua peserta saat ini sebagai argumen string:
+Hub membalas dengan pesan OSC `/who/reply` yang berisi nama semua peserta saat ini sebagai argumen string. `/who/reply` yang sama juga dikirim secara otomatis saat bergabung, sehingga `OSCdef` di bawah ini akan aktif saat koneksi tanpa perlu mengirim `/who` secara eksplisit:
 
 ```supercollider
 OSCdef(\whoReply, { |msg|

@@ -40,6 +40,16 @@ websocket-osc-hub/
 
 ---
 
+## Demo
+
+A public demo Hub is running at `live.oschub.asia`. Note that this server may not always be accessible.
+
+```bash
+python local.py live.oschub.asia
+```
+
+---
+
 ## Requirements
 
 ### Hub server
