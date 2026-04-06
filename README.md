@@ -165,7 +165,7 @@ If `--name` or `--room` are omitted, you will be prompted for them on startup. E
 
 #### SuperCollider setup for performers
 
-Each performer must have the following receive function running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120), strips the `/remote/<n>/` prefix, and forwards to scsynth with timetag preserved so that `sendBundle` timing is honoured.
+Each performer must have the following receive function running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120), strips the `/remote/<n>/` prefix added by the hub, and forwards to scsynth with timetag preserved so that `sendBundle` timing is honoured.
 
 ```supercollider
 // Receive OSC from remote performers, strip the /remote/<n>/ prefix, and forward to scsynth
@@ -176,7 +176,11 @@ Each performer must have the following receive function running in SC before the
         var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
         var delta = time - thisThread.seconds;
-        s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
     };
 };
 thisProcess.addOSCRecvFunc(~remoteProxy);
@@ -197,7 +201,11 @@ s.waitForBoot({
             var parts = address.split($/).reject({ |s| s.isEmpty });
             var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
             var delta = time - thisThread.seconds;
-            s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+            if(delta > 0, {
+                s.sendBundle(delta, [cmd] ++ msg[1..]);
+            }, {
+                s.addr.sendMsg(cmd, *msg[1..]);
+            });
         };
     };
     thisProcess.addOSCRecvFunc(~remoteProxy);
@@ -228,7 +236,7 @@ Radio SCOSC checks whether scsynth is already running when Join is pressed:
 | Situation | Mode | Behaviour |
 |-----------|------|-----------|
 | scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC to sclang (port 57120). The receive function set up automatically strips the `/remote/<n>/` prefix and relays the command to scsynth with timetag preserved. |
-| scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to the existing sclang (port 57120). OSCdef must be run manually in the editor to relay OSC to scsynth. |
+| scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to the existing sclang (port 57120). The receive function must be set up manually in the editor to relay OSC to scsynth. |
 
 In both modes, Radio SCOSC also listens on UDP port 57121 for OSC from SC and forwards it to the hub.
 
@@ -246,7 +254,11 @@ Performers can use Radio SCOSC instead of local.py. In this case:
         var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
         var delta = time - thisThread.seconds;
-        s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
     };
 };
 thisProcess.addOSCRecvFunc(~remoteProxy);
