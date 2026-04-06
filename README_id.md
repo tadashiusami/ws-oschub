@@ -165,17 +165,28 @@ Jika `--name` atau `--room` dihilangkan, Anda akan diminta untuk mengisinya saat
 
 #### Pengaturan SuperCollider untuk performer
 
-Setiap performer harus memiliki OSCdef berikut yang berjalan di SC sebelum sesi dimulai. Ini menerima OSC dari performer lain (dikirim melalui local.py ke port 57120) dan meneruskannya ke scsynth.
+Setiap performer harus memiliki fungsi penerima berikut yang berjalan di SC sebelum sesi dimulai. Ini menerima OSC dari performer lain (dikirim melalui local.py ke port 57120), menghapus prefix `/remote/<n>/` yang ditambahkan oleh hub, dan meneruskannya ke scsynth dengan timetag dipertahankan sehingga timing `sendBundle` dihormati.
 
 ```supercollider
-// Terima OSC dari performer jarak jauh, hapus prefix /remote/<name>/, dan teruskan ke scsynth
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+// Receive OSC from remote performers, strip the /remote/<n>/ prefix, and forward to scsynth
+// timetag is preserved so sendBundle timing is honoured
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 Pengaturan sesi yang umum:
@@ -183,14 +194,21 @@ Pengaturan sesi yang umum:
 ```supercollider
 s.waitForBoot({
 
-    // 1. Siapkan remote proxy
-    OSCdef(\remoteProxy, { |msg, time, addr|
-        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-        if(parts.size >= 3 && { parts[0] == "remote" }, {
+    // 1. Set up the remote proxy
+    ~remoteProxy = { |msg, time, addr, recvPort|
+        var address = msg[0].asString;
+        if(address.beginsWith("/remote/")) {
+            var parts = address.split($/).reject({ |s| s.isEmpty });
             var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-            s.addr.sendMsg(cmd, *msg[1..]);
-        });
-    }, nil);
+            var delta = time - thisThread.seconds;
+            if(delta > 0, {
+                s.sendBundle(delta, [cmd] ++ msg[1..]);
+            }, {
+                s.addr.sendMsg(cmd, *msg[1..]);
+            });
+        };
+    };
+    thisProcess.addOSCRecvFunc(~remoteProxy);
 
     // 2. Kirim SynthDef Anda ke semua peserta
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -217,7 +235,7 @@ Radio SCOSC memeriksa apakah scsynth sudah berjalan saat Join ditekan:
 
 | Situasi | Mode | Perilaku |
 |---------|------|----------|
-| scsynth **belum** berjalan | **Pendengar** | Meluncurkan sclang untuk boot scsynth, lalu meneruskan hub OSC ke sclang (port 57120). `OSCdef(\remoteProxy)` sclang menghapus prefix pengirim dan merelay perintah asli ke scsynth. |
+| scsynth **belum** berjalan | **Pendengar** | Meluncurkan sclang untuk boot scsynth, lalu meneruskan hub OSC ke sclang (port 57120). Fungsi penerima yang disiapkan secara otomatis menghapus prefix `/remote/<n>/` dan merelay perintah ke scsynth dengan timetag dipertahankan. |
 | scsynth **sudah** berjalan | **Performer** | TIDAK meluncurkan sclang. Meneruskan hub OSC ke sclang yang sudah ada (port 57120). OSCdef harus dijalankan secara manual di editor untuk merelay OSC ke scsynth. |
 
 Di kedua mode, Radio SCOSC juga mendengarkan pada UDP port 57121 untuk OSC dari SC dan meneruskannya ke hub.
@@ -227,16 +245,26 @@ Di kedua mode, Radio SCOSC juga mendengarkan pada UDP port 57121 untuk OSC dari 
 Performer dapat menggunakan Radio SCOSC sebagai pengganti local.py. Dalam kasus ini:
 
 1. **Boot server SC terlebih dahulu** di editor Anda (SCIDE, vim/scnvim, Emacs/scel, Overtone, Supriya, dll.) sebelum meluncurkan Radio SCOSC.
-2. Jalankan OSCdef berikut di editor Anda:
+2. Jalankan fungsi berikut di editor Anda:
 
 ```supercollider
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 > **Pengguna Overtone / Supriya:** Pendekatan OSCdef di atas khusus untuk sclang. Penanganan OSC berbeda di Overtone dan Supriya. Lihat dokumentasi masing-masing proyek untuk pola penerimaan OSC yang sesuai.
@@ -284,7 +312,7 @@ npm run build:linux  # Linux AppImage
 #### Cara penggunaan
 
 1. Instal SuperCollider.
-2. *(Hanya untuk performer)* Boot server SC dan jalankan `OSCdef(\remoteProxy, ...)` di editor Anda terlebih dahulu.
+2. *(Hanya untuk performer)* Boot server SC dan siapkan fungsi penerima remote proxy di editor Anda terlebih dahulu.
 3. Luncurkan Radio SCOSC.
 4. Masukkan alamat hub server (mis. `wss://live.example.com` atau `live.example.com`), nama ruang, dan sample rate.
 5. **Kolom nama:**

@@ -165,17 +165,28 @@ Nếu bỏ qua `--name` hoặc `--room`, bạn sẽ được nhắc nhập khi k
 
 #### Cài đặt SuperCollider cho performer
 
-Mỗi performer phải có OSCdef sau đây đang chạy trong SC trước khi phiên bắt đầu. Nó nhận OSC từ performer khác (được giao bởi local.py đến port 57120) và chuyển tiếp đến scsynth.
+Mỗi performer phải có hàm nhận sau đây đang chạy trong SC trước khi phiên bắt đầu. Nó nhận OSC từ performer khác (được giao bởi local.py đến port 57120), loại bỏ tiền tố `/remote/<n>/` được hub thêm vào, và chuyển tiếp đến scsynth với timetag được giữ nguyên để timing của `sendBundle` được tôn trọng.
 
 ```supercollider
-// Nhận OSC từ các performer từ xa, loại bỏ tiền tố /remote/<name>/ và chuyển tiếp đến scsynth
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+// Receive OSC from remote performers, strip the /remote/<n>/ prefix, and forward to scsynth
+// timetag is preserved so sendBundle timing is honoured
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 Cài đặt phiên thông thường:
@@ -183,14 +194,21 @@ Cài đặt phiên thông thường:
 ```supercollider
 s.waitForBoot({
 
-    // 1. Cài đặt remote proxy
-    OSCdef(\remoteProxy, { |msg, time, addr|
-        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-        if(parts.size >= 3 && { parts[0] == "remote" }, {
+    // 1. Set up the remote proxy
+    ~remoteProxy = { |msg, time, addr, recvPort|
+        var address = msg[0].asString;
+        if(address.beginsWith("/remote/")) {
+            var parts = address.split($/).reject({ |s| s.isEmpty });
             var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-            s.addr.sendMsg(cmd, *msg[1..]);
-        });
-    }, nil);
+            var delta = time - thisThread.seconds;
+            if(delta > 0, {
+                s.sendBundle(delta, [cmd] ++ msg[1..]);
+            }, {
+                s.addr.sendMsg(cmd, *msg[1..]);
+            });
+        };
+    };
+    thisProcess.addOSCRecvFunc(~remoteProxy);
 
     // 2. Gửi SynthDef của bạn đến tất cả người tham gia
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -217,7 +235,7 @@ Radio SCOSC kiểm tra xem scsynth đã chạy chưa khi nhấn Join:
 
 | Tình huống | Chế độ | Hành vi |
 |-----------|--------|---------|
-| scsynth **chưa** chạy | **Người nghe** | Khởi chạy sclang để boot scsynth, sau đó chuyển tiếp hub OSC đến sclang (port 57120). `OSCdef(\remoteProxy)` của sclang loại bỏ tiền tố người gửi và chuyển tiếp lệnh gốc đến scsynth. |
+| scsynth **chưa** chạy | **Người nghe** | Khởi chạy sclang để boot scsynth, sau đó chuyển tiếp hub OSC đến sclang (port 57120). Hàm nhận được cài đặt tự động loại bỏ tiền tố `/remote/<n>/` và relay lệnh đến scsynth với timetag được giữ nguyên. |
 | scsynth **đã** chạy | **Performer** | KHÔNG khởi chạy sclang. Chuyển tiếp hub OSC đến sclang hiện có (port 57120). OSCdef phải được chạy thủ công trong editor để relay OSC đến scsynth. |
 
 Ở cả hai chế độ, Radio SCOSC cũng lắng nghe trên UDP port 57121 để nhận OSC từ SC và chuyển tiếp đến hub.
@@ -227,16 +245,26 @@ Radio SCOSC kiểm tra xem scsynth đã chạy chưa khi nhấn Join:
 Performer có thể sử dụng Radio SCOSC thay vì local.py. Trong trường hợp này:
 
 1. **Boot SC server trước** trong editor của bạn (SCIDE, vim/scnvim, Emacs/scel, Overtone, Supriya, v.v.) trước khi khởi chạy Radio SCOSC.
-2. Chạy OSCdef sau trong editor:
+2. Chạy hàm sau trong editor:
 
 ```supercollider
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 > **Người dùng Overtone / Supriya:** Cách tiếp cận OSCdef trên đây dành riêng cho sclang. Xử lý OSC khác nhau giữa Overtone và Supriya. Tham khảo tài liệu của từng dự án để biết pattern nhận OSC phù hợp.
@@ -284,7 +312,7 @@ npm run build:linux  # Linux AppImage
 #### Cách sử dụng
 
 1. Cài đặt SuperCollider.
-2. *(Chỉ dành cho performer)* Boot SC server và chạy `OSCdef(\remoteProxy, ...)` trong editor trước.
+2. *(Chỉ dành cho performer)* Boot SC server và cài đặt hàm nhận remote proxy trong editor của bạn trước.
 3. Khởi chạy Radio SCOSC.
 4. Nhập địa chỉ hub server (ví dụ: `wss://live.example.com` hoặc `live.example.com`), tên phòng và sample rate.
 5. **Trường tên:**

@@ -165,17 +165,28 @@ python local.py your-hub-domain.example.com
 
 #### 演奏者向け SuperCollider セットアップ
 
-セッション開始前に、以下の OSCdef を SC で実行しておく必要があります。他の演奏者からの OSC（local.py 経由でポート 57120 に届く）を受信し、scsynth へ転送します。
+セッション開始前に、以下の受信関数を SC で実行しておく必要があります。他の演奏者からの OSC（local.py 経由でポート 57120 に届く）を受信し、ハブが付加した `/remote/<n>/` プレフィックスを除去して、timetag を保持したまま scsynth へ転送するため、`sendBundle` のタイミングが正しく反映されます。
 
 ```supercollider
-// リモート演奏者からの OSC を受信し、/remote/<名前>/ プレフィックスを除去して scsynth へ転送する
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+// Receive OSC from remote performers, strip the /remote/<n>/ prefix, and forward to scsynth
+// timetag is preserved so sendBundle timing is honoured
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 典型的なセッションセットアップ:
@@ -183,14 +194,21 @@ OSCdef(\remoteProxy, { |msg, time, addr|
 ```supercollider
 s.waitForBoot({
 
-    // 1. リモートプロキシを設定する
-    OSCdef(\remoteProxy, { |msg, time, addr|
-        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-        if(parts.size >= 3 && { parts[0] == "remote" }, {
+    // 1. Set up the remote proxy
+    ~remoteProxy = { |msg, time, addr, recvPort|
+        var address = msg[0].asString;
+        if(address.beginsWith("/remote/")) {
+            var parts = address.split($/).reject({ |s| s.isEmpty });
             var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-            s.addr.sendMsg(cmd, *msg[1..]);
-        });
-    }, nil);
+            var delta = time - thisThread.seconds;
+            if(delta > 0, {
+                s.sendBundle(delta, [cmd] ++ msg[1..]);
+            }, {
+                s.addr.sendMsg(cmd, *msg[1..]);
+            });
+        };
+    };
+    thisProcess.addOSCRecvFunc(~remoteProxy);
 
     // 2. SynthDef を全参加者へ送信する
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -217,7 +235,7 @@ Join を押したとき、Radio SCOSC は scsynth が既に起動しているか
 
 | 状況 | モード | 動作 |
 |------|--------|------|
-| scsynth が**起動していない** | **リスナー** | sclang を起動して scsynth をブートし、ハブからの OSC を sclang（ポート 57120）へ転送します。sclang の `OSCdef(\remoteProxy)` が送信者プレフィックスを除去して scsynth へリレーします。 |
+| scsynth が**起動していない** | **リスナー** | sclang を起動して scsynth をブートし、ハブからの OSC を sclang（ポート 57120）へ転送します。自動的にセットアップされる受信関数が `/remote/<n>/` プレフィックスを除去し、timetag を保持したまま scsynth へリレーします。 |
 | scsynth が**既に起動している** | **演奏者** | sclang を起動しません。ハブからの OSC を既存の sclang（ポート 57120）へ転送します。エディタで OSCdef を手動で実行し、OSC を scsynth へリレーする必要があります。 |
 
 どちらのモードでも、Radio SCOSC はポート 57121 で SC からの OSC を受信してハブへ転送します。
@@ -227,16 +245,26 @@ Join を押したとき、Radio SCOSC は scsynth が既に起動しているか
 演奏者は local.py の代わりに Radio SCOSC を使用できます。その場合:
 
 1. Radio SCOSC を起動する**前に**、エディタ（SCIDE、vim/scnvim、Emacs/scel、Overtone、Supriya など）で SC サーバーを先にブートしてください。
-2. エディタで以下の OSCdef を実行します:
+2. エディタで以下の関数を実行します:
 
 ```supercollider
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        if(delta > 0, {
+            s.sendBundle(delta, [cmd] ++ msg[1..]);
+        }, {
+            s.addr.sendMsg(cmd, *msg[1..]);
+        });
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 > **Overtone / Supriya ユーザーへ:** 上記の OSCdef は sclang 向けです。Overtone や Supriya では OSC 受信の実装が異なります。各プロジェクトのドキュメントを参照してください。
@@ -284,7 +312,7 @@ npm run build:linux  # Linux AppImage
 #### 使い方
 
 1. SuperCollider をインストールする。
-2. *（演奏者のみ）* エディタで SC サーバーをブートし、`OSCdef(\remoteProxy, ...)` を実行してから Radio SCOSC を起動する。
+2. *（演奏者のみ）* エディタで SC サーバーをブートし、リモートプロキシ受信関数をセットアップしてから Radio SCOSC を起動する。
 3. Radio SCOSC を起動する。
 4. ハブサーバーのアドレス（例：`wss://live.example.com` または `live.example.com`）、ルーム名、サンプルレートを入力する。
 5. **名前フィールド:**
