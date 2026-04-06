@@ -225,13 +225,16 @@ function startSclang(rate, onReady) {
     const initCode = [
         `s.options.sampleRate = ${rate};`,
         `s.waitForBoot({`,
-        `    OSCdef(\\remoteProxy, { |msg, time, addr|`,
-        `        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });`,
-        `        if(parts.size >= 3 && { parts[0] == "remote" }, {`,
+        `    ~remoteProxy = { |msg, time, addr, recvPort|`,
+        `        var address = msg[0].asString;`,
+        `        if(address.beginsWith("/remote/")) {`,
+        `            var parts = address.split($/).reject({ |s| s.isEmpty });`,
         `            var cmd = ("/" ++ parts[2..].join("/")).asSymbol;`,
-        `            s.addr.sendMsg(cmd, *msg[1..]);`,
-        `        });`,
-        `    }, nil);`,
+        `            var delta = time - thisThread.seconds;`,
+        `            s.addr.sendBundle(delta, [cmd] ++ msg[1..]);`,
+        `        };`,
+        `    };`,
+        `    thisProcess.addOSCRecvFunc(~remoteProxy);`,
         `    "Radio SCOSC ready".postln;`,
         `});`
     ].join('\n');

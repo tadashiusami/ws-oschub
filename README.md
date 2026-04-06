@@ -165,17 +165,24 @@ If `--name` or `--room` are omitted, you will be prompted for them on startup. E
 
 #### SuperCollider setup for performers
 
-Each performer must have the following OSCdef running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120) and forwards it to scsynth.
+Each performer must have the following receive function running in SC before the session starts. This receives OSC from other performers (delivered via local.py to port 57120), strips the `/remote/<n>/` prefix, and forwards to scsynth with timetag preserved so that `sendBundle` timing is honoured.
 
 ```supercollider
-// Receive OSC from remote performers, strip the /remote/<name>/ prefix, and forward to scsynth
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+// Receive OSC from remote performers, strip the /remote/<n>/ prefix, and forward to scsynth
+// timetag is preserved so sendBundle timing is honoured
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 A typical session setup:
@@ -184,13 +191,16 @@ A typical session setup:
 s.waitForBoot({
 
     // 1. Set up the remote proxy
-    OSCdef(\remoteProxy, { |msg, time, addr|
-        var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-        if(parts.size >= 3 && { parts[0] == "remote" }, {
+    ~remoteProxy = { |msg, time, addr, recvPort|
+        var address = msg[0].asString;
+        if(address.beginsWith("/remote/")) {
+            var parts = address.split($/).reject({ |s| s.isEmpty });
             var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-            s.addr.sendMsg(cmd, *msg[1..]);
-        });
-    }, nil);
+            var delta = time - thisThread.seconds;
+            s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+        };
+    };
+    thisProcess.addOSCRecvFunc(~remoteProxy);
 
     // 2. Send your SynthDef to all participants
     ~hub = NetAddr("127.0.0.1", 57121);
@@ -217,7 +227,7 @@ Radio SCOSC checks whether scsynth is already running when Join is pressed:
 
 | Situation | Mode | Behaviour |
 |-----------|------|-----------|
-| scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC to sclang (port 57120). sclang's `OSCdef(\remoteProxy)` strips the sender prefix and relays the original command to scsynth. |
+| scsynth **not** running | **Listener** | Launches sclang to boot scsynth, then forwards hub OSC to sclang (port 57120). The receive function set up automatically strips the `/remote/<n>/` prefix and relays the command to scsynth with timetag preserved. |
 | scsynth **already** running | **Performer** | Does NOT launch sclang. Forwards hub OSC to the existing sclang (port 57120). OSCdef must be run manually in the editor to relay OSC to scsynth. |
 
 In both modes, Radio SCOSC also listens on UDP port 57121 for OSC from SC and forwards it to the hub.
@@ -230,13 +240,19 @@ Performers can use Radio SCOSC instead of local.py. In this case:
 2. Run the following OSCdef in your editor:
 
 ```supercollider
-OSCdef(\remoteProxy, { |msg, time, addr|
-    var parts = msg[0].asString.split($/).reject({ |s| s.isEmpty });
-    if(parts.size >= 3 && { parts[0] == "remote" }, {
+~remoteProxy = { |msg, time, addr, recvPort|
+    var address = msg[0].asString;
+    if(address.beginsWith("/remote/")) {
+        var parts = address.split($/).reject({ |s| s.isEmpty });
         var cmd = ("/" ++ parts[2..].join("/")).asSymbol;
-        s.addr.sendMsg(cmd, *msg[1..]);
-    });
-}, nil);
+        var delta = time - thisThread.seconds;
+        s.addr.sendBundle(delta, [cmd] ++ msg[1..]);
+    };
+};
+thisProcess.addOSCRecvFunc(~remoteProxy);
+
+// To remove:
+// thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
 > **Overtone / Supriya users:** The OSCdef approach above is specific to sclang. OSC handling varies by implementation in Overtone and Supriya. Refer to each project's documentation for the appropriate OSC receive patterns.
@@ -284,7 +300,7 @@ npm run build:linux  # Linux AppImage
 #### Usage
 
 1. Install SuperCollider.
-2. *(Performer only)* Boot the SC server and run `OSCdef(\remoteProxy, ...)` in your editor first.
+2. *(Performer only)* Boot the SC server and set up the remote proxy receive function in your editor first.
 3. Launch Radio SCOSC.
 4. Enter the hub server address (e.g. `wss://live.example.com` or just `live.example.com`), room name, and sample rate.
 5. **Name field:**
