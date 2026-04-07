@@ -179,7 +179,7 @@ python local.py your-hub-domain.example.com
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -204,7 +204,7 @@ s.waitForBoot({
             if(delta > 0, {
                 s.sendBundle(delta, [cmd] ++ msg[1..]);
             }, {
-                s.addr.sendMsg(cmd, *msg[1..]);
+                s.sendMsg(cmd, *msg[1..]);
             });
         };
     };
@@ -257,7 +257,7 @@ Radio SCOSC 既可供听众使用，也可供演奏者使用。
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -267,7 +267,7 @@ thisProcess.addOSCRecvFunc(~remoteProxy);
 // thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
-> **致 Overtone / Supriya 用户：** 上述 OSCdef 适用于 sclang。Overtone 和 Supriya 的 OSC 接收实现方式不同，请参阅各项目的文档。
+> **致 Overtone / Supriya 用户：** 上述 `thisProcess.addOSCRecvFunc` 适用于 sclang。Overtone 和 Supriya 的 OSC 接收实现方式不同，请参阅各项目的文档。
 
 3. 启动 Radio SCOSC 并加入会话。
 4. OSC 的发送目标与 local.py 相同，均为端口 57121（Radio SCOSC）：

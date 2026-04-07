@@ -179,7 +179,7 @@ Mỗi performer phải có hàm nhận sau đây đang chạy trong SC trước 
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -204,7 +204,7 @@ s.waitForBoot({
             if(delta > 0, {
                 s.sendBundle(delta, [cmd] ++ msg[1..]);
             }, {
-                s.addr.sendMsg(cmd, *msg[1..]);
+                s.sendMsg(cmd, *msg[1..]);
             });
         };
     };
@@ -257,7 +257,7 @@ Performer có thể sử dụng Radio SCOSC thay vì local.py. Trong trường h
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -267,7 +267,7 @@ thisProcess.addOSCRecvFunc(~remoteProxy);
 // thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
-> **Người dùng Overtone / Supriya:** Cách tiếp cận OSCdef trên đây dành riêng cho sclang. Xử lý OSC khác nhau giữa Overtone và Supriya. Tham khảo tài liệu của từng dự án để biết pattern nhận OSC phù hợp.
+> **Người dùng Overtone / Supriya:** Cách tiếp cận `thisProcess.addOSCRecvFunc` trên đây dành riêng cho sclang. Xử lý OSC khác nhau giữa Overtone và Supriya. Tham khảo tài liệu của từng dự án để biết pattern nhận OSC phù hợp.
 
 3. Khởi chạy Radio SCOSC và tham gia phiên.
 4. Gửi OSC đến port 57121 (Radio SCOSC) thay vì local.py:

@@ -179,7 +179,7 @@ Ang bawat performer ay dapat may sumusunod na receive function na tumatakbo sa S
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -204,7 +204,7 @@ s.waitForBoot({
             if(delta > 0, {
                 s.sendBundle(delta, [cmd] ++ msg[1..]);
             }, {
-                s.addr.sendMsg(cmd, *msg[1..]);
+                s.sendMsg(cmd, *msg[1..]);
             });
         };
     };
@@ -257,7 +257,7 @@ Maaaring gamitin ng mga performer ang Radio SCOSC sa halip na local.py. Sa ganit
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -267,7 +267,7 @@ thisProcess.addOSCRecvFunc(~remoteProxy);
 // thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
-> **Para sa mga gumagamit ng Overtone / Supriya:** Ang OSCdef approach sa itaas ay para sa sclang. Ang OSC handling ay nag-iiba-iba sa Overtone at Supriya. Sumangguni sa dokumentasyon ng bawat proyekto para sa angkop na OSC receive pattern.
+> **Para sa mga gumagamit ng Overtone / Supriya:** Ang `thisProcess.addOSCRecvFunc` approach sa itaas ay para sa sclang. Ang OSC handling ay nag-iiba-iba sa Overtone at Supriya. Sumangguni sa dokumentasyon ng bawat proyekto para sa angkop na OSC receive pattern.
 
 3. Ilunsad ang Radio SCOSC at sumali sa session.
 4. Magpadala ng OSC sa port 57121 (Radio SCOSC) sa halip na local.py:

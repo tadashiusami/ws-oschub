@@ -179,7 +179,7 @@ Setiap performer harus memiliki fungsi penerima berikut yang berjalan di SC sebe
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -204,7 +204,7 @@ s.waitForBoot({
             if(delta > 0, {
                 s.sendBundle(delta, [cmd] ++ msg[1..]);
             }, {
-                s.addr.sendMsg(cmd, *msg[1..]);
+                s.sendMsg(cmd, *msg[1..]);
             });
         };
     };
@@ -257,7 +257,7 @@ Performer dapat menggunakan Radio SCOSC sebagai pengganti local.py. Dalam kasus 
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -267,7 +267,7 @@ thisProcess.addOSCRecvFunc(~remoteProxy);
 // thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
-> **Pengguna Overtone / Supriya:** Pendekatan OSCdef di atas khusus untuk sclang. Penanganan OSC berbeda di Overtone dan Supriya. Lihat dokumentasi masing-masing proyek untuk pola penerimaan OSC yang sesuai.
+> **Pengguna Overtone / Supriya:** Pendekatan `thisProcess.addOSCRecvFunc` di atas khusus untuk sclang. Penanganan OSC berbeda di Overtone dan Supriya. Lihat dokumentasi masing-masing proyek untuk pola penerimaan OSC yang sesuai.
 
 3. Luncurkan Radio SCOSC dan bergabung ke sesi.
 4. Kirim OSC ke port 57121 (Radio SCOSC) bukan local.py:

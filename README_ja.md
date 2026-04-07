@@ -179,7 +179,7 @@ python local.py your-hub-domain.example.com
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -204,7 +204,7 @@ s.waitForBoot({
             if(delta > 0, {
                 s.sendBundle(delta, [cmd] ++ msg[1..]);
             }, {
-                s.addr.sendMsg(cmd, *msg[1..]);
+                s.sendMsg(cmd, *msg[1..]);
             });
         };
     };
@@ -257,7 +257,7 @@ Join を押したとき、Radio SCOSC は scsynth が既に起動しているか
         if(delta > 0, {
             s.sendBundle(delta, [cmd] ++ msg[1..]);
         }, {
-            s.addr.sendMsg(cmd, *msg[1..]);
+            s.sendMsg(cmd, *msg[1..]);
         });
     };
 };
@@ -267,7 +267,7 @@ thisProcess.addOSCRecvFunc(~remoteProxy);
 // thisProcess.removeOSCRecvFunc(~remoteProxy);
 ```
 
-> **Overtone / Supriya ユーザーへ:** 上記の OSCdef は sclang 向けです。Overtone や Supriya では OSC 受信の実装が異なります。各プロジェクトのドキュメントを参照してください。
+> **Overtone / Supriya ユーザーへ:** 上記の `thisProcess.addOSCRecvFunc` は sclang 向けです。Overtone や Supriya では OSC 受信の実装が異なります。各プロジェクトのドキュメントを参照してください。
 
 3. Radio SCOSC を起動してセッションに参加します。
 4. OSC の送信先は local.py と同じくポート 57121（Radio SCOSC）です:
