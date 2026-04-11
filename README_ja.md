@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **リスナーモード**（scsynth 未起動）: 名前フィールドは無視され、`listener-XXXX` 形式のランダムな名前が自動で割り当てられる。
 6. **Join** をクリックする。
 
+#### /ping コマンド
+
+任意の参加者が、タイムスタンプ付きの `/ping` メッセージを送信することでネットワーク遅延を計測できます。ハブはすべての引数を保持したまま `/ping/reply` として返します:
+
+```supercollider
+// 2秒ごとに遅延を継続的に計測し、~latency を更新する
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // 最悪ケース × 1.5 の安全マージン
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// 停止するには:
+// ~pingRoutine.stop;
+```
+
 #### /who コマンド
 
 ハブへ OSC `/who` メッセージを送信することで、現在のルームの参加者一覧を取得できます:

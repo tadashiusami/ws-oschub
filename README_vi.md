@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **Chế độ Listener** (scsynth chưa chạy): trường tên bị bỏ qua — tên ngẫu nhiên dạng `listener-XXXX` được tự động gán.
 6. Nhấp **Join**.
 
+#### Lệnh /ping
+
+Bất kỳ người tham gia nào cũng có thể đo độ trễ mạng bằng cách gửi tin nhắn `/ping` kèm timestamp. Hub sẽ phản hồi lại dưới dạng `/ping/reply` với tất cả argument được giữ nguyên:
+
+```supercollider
+// Đo độ trễ liên tục và cập nhật ~latency mỗi 2 giây
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // trường hợp tệ nhất × 1.5 biên an toàn
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// Dừng ping:
+// ~pingRoutine.stop;
+```
+
 #### Lệnh /who
 
 Bất kỳ người tham gia nào cũng có thể truy vấn danh sách thành viên phòng hiện tại bằng cách gửi tin nhắn OSC `/who` đến hub:

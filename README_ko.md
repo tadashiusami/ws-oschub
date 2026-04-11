@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **리스너 모드**（scsynth 미실행）: 이름 필드는 무시되며 `listener-XXXX` 형식의 랜덤 이름이 자동으로 할당됩니다.
 6. **Join**을 클릭합니다.
 
+#### /ping 커맨드
+
+어느 참가자든 타임스탬프가 포함된 `/ping` 메시지를 전송하여 네트워크 지연을 측정할 수 있습니다. 허브는 모든 인수를 보존하여 `/ping/reply`로 돌려줍니다:
+
+```supercollider
+// 2초마다 지연을 지속적으로 측정하여 ~latency 업데이트
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // 최악의 경우 × 1.5 안전 마진
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// 정지하려면:
+// ~pingRoutine.stop;
+```
+
 #### /who 커맨드
 
 허브에 OSC `/who` 메시지를 전송하여 현재 룸의 참가자 목록을 얻을 수 있습니다:

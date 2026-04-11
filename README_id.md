@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **Mode Listener** (scsynth belum berjalan): kolom nama diabaikan — nama acak berformat `listener-XXXX` ditetapkan secara otomatis.
 6. Klik **Join**.
 
+#### Perintah /ping
+
+Peserta mana pun dapat mengukur latensi jaringan dengan mengirim pesan `/ping` beserta timestamp. Hub akan menggemakannya kembali sebagai `/ping/reply` dengan semua argumen yang dipertahankan:
+
+```supercollider
+// Ukur latensi secara terus-menerus dan perbarui ~latency setiap 2 detik
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // kasus terburuk × 1.5 margin keamanan
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// Hentikan ping:
+// ~pingRoutine.stop;
+```
+
 #### Perintah /who
 
 Peserta mana pun dapat menanyakan keanggotaan ruang saat ini dengan mengirim pesan OSC `/who` ke hub:

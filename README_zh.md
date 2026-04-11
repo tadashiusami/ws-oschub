@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **听众模式**（scsynth 未运行）：名称字段将被忽略，系统自动分配 `listener-XXXX` 格式的随机名称。
 6. 点击 **Join**。
 
+#### /ping 命令
+
+任何参与者都可以通过发送带有时间戳的 `/ping` 消息来测量网络延迟。Hub 会将所有参数原样保留，以 `/ping/reply` 的形式回应：
+
+```supercollider
+// 每 2 秒持续测量延迟并更新 ~latency
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // 最差情况 × 1.5 安全裕量
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// 停止 ping：
+// ~pingRoutine.stop;
+```
+
 #### /who 命令
 
 向 Hub 发送 OSC `/who` 消息，可获取当前房间的参与者列表：

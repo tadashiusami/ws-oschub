@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **Listener mode** (hindi tumatakbo ang scsynth): ang field ng pangalan ay binabalewala — isang random na pangalang `listener-XXXX` ang awtomatikong itinalaga.
 6. I-click ang **Join**.
 
+#### /ping command
+
+Ang sinumang kalahok ay maaaring sukatin ang network latency sa pamamagitan ng pagpapadala ng `/ping` mensahe na may timestamp. Inuulit ito ng hub pabalik bilang `/ping/reply` na may lahat ng argument na napanatili:
+
+```supercollider
+// Patuloy na sukatin ang latency at i-update ang ~latency bawat 2 segundo
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // pinakamasamang kaso × 1.5 safety margin
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// Ihinto ang pag-ping:
+// ~pingRoutine.stop;
+```
+
 #### /who command
 
 Ang sinumang kalahok ay maaaring mag-query ng kasalukuyang membership ng silid sa pamamagitan ng pagpapadala ng OSC `/who` mensahe sa hub:

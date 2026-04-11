@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **โหมดผู้ฟัง** (scsynth ไม่ได้ทำงาน): ช่องชื่อจะถูกละเว้น — ชื่อสุ่มในรูปแบบ `listener-XXXX` จะถูกกำหนดโดยอัตโนมัติ
 6. คลิก **Join**
 
+#### คำสั่ง /ping
+
+ผู้เข้าร่วมคนใดก็ได้สามารถวัดความหน่วงของเครือข่ายโดยส่งข้อความ `/ping` พร้อม timestamp ฮับจะส่งกลับเป็น `/ping/reply` โดยเก็บอาร์กิวเมนต์ทั้งหมดไว้:
+
+```supercollider
+// วัดความหน่วงอย่างต่อเนื่องและอัปเดต ~latency ทุก 2 วินาที
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // กรณีเลวร้ายที่สุด × 1.5 margin ความปลอดภัย
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// หยุด ping:
+// ~pingRoutine.stop;
+```
+
 #### คำสั่ง /who
 
 ผู้เข้าร่วมคนใดก็ได้สามารถสอบถามสมาชิกปัจจุบันของห้องโดยส่งข้อความ OSC `/who` ไปยังฮับ:
