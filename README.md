@@ -320,6 +320,38 @@ npm run build:linux  # Linux AppImage
    - **Listener mode** (scsynth not running): the name field is ignored — a random `listener-XXXX` name is assigned automatically.
 6. Click **Join**.
 
+#### /ping command
+
+Any participant can measure network latency by sending a `/ping` message with a timestamp. The hub echoes it back as `/ping/reply` with all arguments preserved:
+
+```supercollider
+// Continuously measure latency and update ~latency every 2 seconds
+~pingTimes = Array.newClear(10);
+~pingIndex = 0;
+
+OSCdef(\pingReply, { |msg|
+    var rtt = Date.getDate.rawSeconds - msg[1].asFloat;
+    var latency = rtt / 2;
+    ~pingTimes[~pingIndex % 10] = latency;
+    ~pingIndex = ~pingIndex + 1;
+    if(~pingIndex >= 10) {
+        var valid = ~pingTimes.select({ |v| v.notNil });
+        ~latency = valid.maxItem * 1.5;  // worst-case * 1.5 safety margin
+        ("latency updated: " ++ ~latency.round(0.001) ++ "s").postln;
+    };
+}, '/ping/reply');
+
+~pingRoutine = Routine({
+    loop {
+        ~hub.sendMsg('/ping', Date.getDate.rawSeconds);
+        2.wait;
+    };
+}).play(SystemClock);
+
+// Stop pinging:
+// ~pingRoutine.stop;
+```
+
 #### /who command
 
 Any participant can query the current room membership by sending an OSC `/who` message to the hub:

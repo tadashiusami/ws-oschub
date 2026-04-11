@@ -148,6 +148,20 @@ def bundle_contains_who(data: bytes, _depth: int = 0) -> bool:
     return False
 
 
+def rewrite_ping_to_reply(data: bytes) -> bytes:
+    """/ping address rewritten to /ping/reply. Arguments are preserved as-is."""
+    try:
+        null_pos = data.index(b'\x00')
+        addr = data[:null_pos].decode('utf-8')
+        if addr != '/ping':
+            return data
+        old_addr_padded = _pad4(null_pos + 1)
+        new_addr = b'/ping/reply\x00'  # 12 bytes, 4-byte aligned
+        return new_addr + data[old_addr_padded:]
+    except Exception:
+        return data
+
+
 # room name -> {ws: name}
 rooms: dict[str, dict] = {}
 
@@ -276,6 +290,11 @@ async def handler(ws):
                     members = list(rooms[room].values())
                     await send_binary(ws, build_osc_message('/who/reply', *members))
                     logger.info(f"[/who] Replied to '{name}' with {members}")
+                elif parse_osc_address(message) == '/ping':
+                    # Hub-only: echo back with /ping/reply, preserving all arguments
+                    reply = rewrite_ping_to_reply(message)
+                    await send_binary(ws, reply)
+                    logger.debug(f"[/ping] Replied to '{name}'")
                 else:
                     targets = [c for c in rooms[room] if c != ws]
                     if targets:
